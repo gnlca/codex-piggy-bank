@@ -67,52 +67,46 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         let textColor = NSColor.labelColor
         let title = NSMutableAttributedString()
 
+        if let piggyBankIcon {
+            title.append(attachment(for: piggyBankIcon, size: 17, yOffset: -3))
+        }
+
+        title.append(
+            NSAttributedString(
+                string: " \(presentation.leadingText)",
+                attributes: [
+                    .font: font,
+                    .foregroundColor: textColor,
+                ]
+            )
+        )
+
         if !presentation.showsBankSummary {
             title.append(
                 NSAttributedString(
-                    string: "\(presentation.leadingText) · ",
+                    string: " · ",
                     attributes: [
                         .font: font,
                         .foregroundColor: textColor,
                     ]
                 )
             )
-        }
 
-        if let image = statusIcon(for: presentation) {
-            image.isTemplate = false
-            let attachment = NSTextAttachment()
-            attachment.image = image
-            let iconSize: CGFloat = presentation.showsBankSummary ? 17 : 15
-            attachment.bounds = NSRect(
-                x: 0,
-                y: presentation.showsBankSummary ? -3 : -2,
-                width: iconSize,
-                height: iconSize
-            )
-            title.append(NSAttributedString(attachment: attachment))
-        }
+            if let image = statusIcon(for: presentation) {
+                title.append(attachment(for: image, size: 15, yOffset: -2))
+            }
 
-        if presentation.showsBankSummary {
-            title.append(
-                NSAttributedString(
-                    string: " \(presentation.leadingText)",
-                    attributes: [
-                        .font: font,
-                        .foregroundColor: textColor,
-                    ]
+            if !presentation.deadline.isEmpty {
+                title.append(
+                    NSAttributedString(
+                        string: " \(presentation.deadline)",
+                        attributes: [
+                            .font: font,
+                            .foregroundColor: textColor,
+                        ]
+                    )
                 )
-            )
-        } else if !presentation.deadline.isEmpty {
-            title.append(
-                NSAttributedString(
-                    string: " \(presentation.deadline)",
-                    attributes: [
-                        .font: font,
-                        .foregroundColor: textColor,
-                    ]
-                )
-            )
+            }
         }
 
         button.image = nil
@@ -120,25 +114,42 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         button.toolTip = "\(store.availableResetCount) resets available"
     }
 
-    private func statusIcon(for presentation: StatusPresentation) -> NSImage? {
-        if presentation.showsBankSummary {
-            guard let source = NSImage(named: "NucleoPiggyBank") else {
-                return nil
-            }
-
-            return NSImage(size: NSSize(width: 17, height: 17), flipped: false) { rect in
-                presentation.symbolColor.setFill()
-                rect.fill()
-                source.draw(
-                    in: rect,
-                    from: .zero,
-                    operation: .destinationIn,
-                    fraction: 1
-                )
-                return true
-            }
+    private var piggyBankIcon: NSImage? {
+        guard let source = NSImage(named: "NucleoPiggyBank") else {
+            return nil
         }
 
+        return NSImage(size: NSSize(width: 17, height: 17), flipped: false) { rect in
+            NSColor.white.setFill()
+            rect.fill()
+            source.draw(
+                in: rect,
+                from: .zero,
+                operation: .destinationIn,
+                fraction: 1
+            )
+            return true
+        }
+    }
+
+    private func attachment(
+        for image: NSImage,
+        size: CGFloat,
+        yOffset: CGFloat
+    ) -> NSAttributedString {
+        image.isTemplate = false
+        let attachment = NSTextAttachment()
+        attachment.image = image
+        attachment.bounds = NSRect(
+            x: 0,
+            y: yOffset,
+            width: size,
+            height: size
+        )
+        return NSAttributedString(attachment: attachment)
+    }
+
+    private func statusIcon(for presentation: StatusPresentation) -> NSImage? {
         return NSImage(
             systemSymbolName: presentation.symbolName,
             accessibilityDescription: nil
