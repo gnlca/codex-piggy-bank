@@ -9,6 +9,7 @@ DIST_DIR="$ROOT_DIR/dist"
 APP_BUNDLE="$DERIVED_DATA/Build/Products/Release/$APP_NAME.app"
 DMG_PATH="$DIST_DIR/Codex-Piggy-Bank-$VERSION-universal.dmg"
 STAGING_DIR="$ROOT_DIR/.build/dmg-staging"
+ENTITLEMENTS_PATH="$ROOT_DIR/Configuration/CodexPiggyBank.entitlements"
 
 SIGNING_IDENTITY="${DEVELOPER_ID_APPLICATION:-}"
 NOTARY_PROFILE="${NOTARY_PROFILE:-codex-piggy-bank-notary}"
@@ -47,10 +48,13 @@ codesign \
   --deep \
   --options runtime \
   --timestamp \
+  --entitlements "$ENTITLEMENTS_PATH" \
   --sign "$SIGNING_IDENTITY" \
   "$APP_BUNDLE"
 
 codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE"
+codesign -d --entitlements :- "$APP_BUNDLE" 2>&1 \
+  | grep -Fq "com.apple.security.personal-information.calendars"
 lipo -archs "$APP_BUNDLE/Contents/MacOS/$APP_NAME" | grep -q "arm64"
 lipo -archs "$APP_BUNDLE/Contents/MacOS/$APP_NAME" | grep -q "x86_64"
 

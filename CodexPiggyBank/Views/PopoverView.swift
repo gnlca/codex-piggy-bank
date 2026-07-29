@@ -78,6 +78,7 @@ struct PopoverView: View {
                 .resizable()
                 .renderingMode(.template)
                 .scaledToFit()
+                .foregroundStyle(codexPurpleGradient)
                 .frame(width: 18, height: 18)
 
             Text("Codex Piggy Bank")
@@ -105,6 +106,18 @@ struct PopoverView: View {
         .padding(.horizontal, 16)
         .padding(.top, 12)
         .padding(.bottom, 6)
+    }
+
+    private var codexPurpleGradient: LinearGradient {
+        LinearGradient(
+            stops: [
+                .init(color: Color(red: 177 / 255, green: 167 / 255, blue: 1), location: 0),
+                .init(color: Color(red: 122 / 255, green: 157 / 255, blue: 1), location: 0.5),
+                .init(color: Color(red: 57 / 255, green: 65 / 255, blue: 1), location: 1),
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
     }
 
     private var footer: some View {
