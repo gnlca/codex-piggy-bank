@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/codex-piggy-bank-icon.png" width="128" alt="Codex Piggy Bank app icon">
+</p>
+
 # Codex Piggy Bank
 
 A lightweight macOS menu bar app for tracking Codex usage limits and banked reset expiration times.
