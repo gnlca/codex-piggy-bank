@@ -3,7 +3,7 @@
 A lightweight macOS menu bar app for tracking Codex usage limits and banked
 reset expiration times.
 
-![Codex Piggy Bank menu bar popover](docs/codex-piggy-bank.png)
+![Codex Piggy Bank menu bar popover](docs/codex-piggy-bank.jpeg)
 
 ## Features
 
