@@ -37,7 +37,7 @@ actor SnapshotCache {
         ).first ?? FileManager.default.temporaryDirectory
 
         return base
-            .appendingPathComponent("Codex Reset Alert", isDirectory: true)
+            .appendingPathComponent("Codex Piggy Bank", isDirectory: true)
             .appendingPathComponent("snapshot.json")
     }
 }

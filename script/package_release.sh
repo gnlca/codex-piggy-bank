@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP_NAME="Codex Reset Alert"
+APP_NAME="Codex Piggy Bank"
 VERSION="1.0.0"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DERIVED_DATA="$ROOT_DIR/.build/ReleaseDerivedData"
 DIST_DIR="$ROOT_DIR/dist"
 APP_BUNDLE="$DERIVED_DATA/Build/Products/Release/$APP_NAME.app"
-DMG_PATH="$DIST_DIR/Codex-Banked-Resets-$VERSION-universal.dmg"
+DMG_PATH="$DIST_DIR/Codex-Piggy-Bank-$VERSION-universal.dmg"
 STAGING_DIR="$ROOT_DIR/.build/dmg-staging"
 
 SIGNING_IDENTITY="${DEVELOPER_ID_APPLICATION:-}"
-NOTARY_PROFILE="${NOTARY_PROFILE:-codex-banked-resets-notary}"
+NOTARY_PROFILE="${NOTARY_PROFILE:-codex-piggy-bank-notary}"
 
 if [[ -z "$SIGNING_IDENTITY" ]]; then
   echo "Manca DEVELOPER_ID_APPLICATION." >&2
@@ -33,8 +33,8 @@ fi
 mkdir -p "$DIST_DIR"
 
 xcodebuild \
-  -project "$ROOT_DIR/CodexResetAlert.xcodeproj" \
-  -scheme CodexResetAlert \
+  -project "$ROOT_DIR/CodexPiggyBank.xcodeproj" \
+  -scheme CodexPiggyBank \
   -configuration Release \
   -derivedDataPath "$DERIVED_DATA" \
   ARCHS="arm64 x86_64" \

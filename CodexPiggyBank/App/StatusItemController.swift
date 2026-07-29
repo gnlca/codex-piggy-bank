@@ -36,8 +36,8 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         button.target = self
         button.action = #selector(togglePopover)
         button.sendAction(on: [.leftMouseUp])
-        button.toolTip = "Codex Reset Alert"
-        button.setAccessibilityLabel("Codex Reset Alert")
+        button.toolTip = "Codex Piggy Bank"
+        button.setAccessibilityLabel("Codex Piggy Bank")
         button.wantsLayer = true
         button.layer?.cornerCurve = .continuous
         button.layer?.cornerRadius = 7

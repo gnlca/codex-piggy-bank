@@ -80,7 +80,7 @@ struct PopoverView: View {
                 .scaledToFit()
                 .frame(width: 18, height: 18)
 
-            Text("Codex Banked Resets")
+            Text("Codex Piggy Bank")
                 .font(.headline.weight(.regular))
 
             Spacer()
@@ -134,8 +134,8 @@ struct PopoverView: View {
                     .frame(width: 16, height: 16)
             }
             .liquidGlassCircleButton()
-            .help("Quit Codex Reset Alert")
-            .accessibilityLabel("Quit Codex Reset Alert")
+            .help("Quit Codex Piggy Bank")
+            .accessibilityLabel("Quit Codex Piggy Bank")
         }
         .padding(.horizontal, 16)
         .padding(.top, 18)

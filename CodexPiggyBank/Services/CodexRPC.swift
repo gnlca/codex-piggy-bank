@@ -14,7 +14,7 @@ enum CodexRPC {
             "params": [
                 "clientInfo": [
                     "name": "codex_reset_alert",
-                    "title": "Codex Reset Alert",
+                    "title": "Codex Piggy Bank",
                     "version": version,
                 ],
             ],

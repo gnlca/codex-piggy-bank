@@ -3,7 +3,7 @@ import SwiftUI
 import UserNotifications
 
 @main
-struct CodexResetAlertApp: App {
+struct CodexPiggyBankApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     var body: some Scene {

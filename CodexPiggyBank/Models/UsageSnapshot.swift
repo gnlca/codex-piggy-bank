@@ -95,6 +95,6 @@ struct ResetCredit: Codable, Equatable, Identifiable, Sendable {
     }
 
     var notificationIdentifier: String {
-        "codex-reset-alert.\(id)"
+        "codex-piggy-bank.\(id)"
     }
 }

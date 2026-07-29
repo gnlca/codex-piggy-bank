@@ -2,9 +2,9 @@
 set -euo pipefail
 
 MODE="${1:-run}"
-APP_NAME="Codex Reset Alert"
-BUNDLE_ID="com.gnlca.codexresetalert"
-PROCESS_NAME="Codex Reset Alert"
+APP_NAME="Codex Piggy Bank"
+BUNDLE_ID="com.gnlca.codexpiggybank"
+PROCESS_NAME="Codex Piggy Bank"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DERIVED_DATA="$ROOT_DIR/.build/DerivedData"
@@ -14,8 +14,8 @@ APP_BINARY="$APP_BUNDLE/Contents/MacOS/$APP_NAME"
 pkill -x "$PROCESS_NAME" >/dev/null 2>&1 || true
 
 xcodebuild \
-  -project "$ROOT_DIR/CodexResetAlert.xcodeproj" \
-  -scheme CodexResetAlert \
+  -project "$ROOT_DIR/CodexPiggyBank.xcodeproj" \
+  -scheme CodexPiggyBank \
   -configuration Debug \
   -derivedDataPath "$DERIVED_DATA" \
   CODE_SIGN_IDENTITY=- \

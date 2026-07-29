@@ -124,7 +124,7 @@ actor NotificationService: NotificationScheduling {
     }
 
     private static func creditKey(from identifier: String) -> String? {
-        let prefix = "codex-reset-alert."
+        let prefix = "codex-piggy-bank."
         guard identifier.hasPrefix(prefix) else {
             return nil
         }

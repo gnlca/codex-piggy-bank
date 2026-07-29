@@ -1,9 +1,9 @@
-# Codex Banked Resets
+# Codex Piggy Bank
 
 A lightweight macOS menu bar app for tracking Codex usage limits and banked
 reset expiration times.
 
-![Codex Banked Resets menu bar popover](docs/codex-banked-resets.png)
+![Codex Piggy Bank menu bar popover](docs/codex-piggy-bank.png)
 
 ## Features
 
@@ -20,8 +20,8 @@ reset expiration times.
 ## Download
 
 1. Download the latest universal DMG from
-   [GitHub Releases](https://github.com/gnlca/codex-banked-resets/releases/latest).
-2. Open the DMG and drag **Codex Reset Alert** to **Applications**.
+   [GitHub Releases](https://github.com/gnlca/codex-piggy-bank/releases/latest).
+2. Open the DMG and drag **Codex Piggy Bank** to **Applications**.
 3. Launch the app. It appears only in the menu bar.
 
 The release supports Apple silicon and Intel Macs running macOS 14 or later.
@@ -48,8 +48,8 @@ respective controls.
 Requirements: Xcode 26 or later and an authenticated Codex CLI installation.
 
 ```sh
-git clone https://github.com/gnlca/codex-banked-resets.git
-cd codex-banked-resets
+git clone https://github.com/gnlca/codex-piggy-bank.git
+cd codex-piggy-bank
 ./script/build_and_run.sh --verify
 ```
 
@@ -60,8 +60,8 @@ Developer ID, submits the DMG to Apple for notarization, staples the ticket, and
 validates the finished artifact.
 
 ```sh
-export DEVELOPER_ID_APPLICATION='Developer ID Application: NDRT S.R.L. (TEAMID)'
-export NOTARY_PROFILE='codex-banked-resets-notary'
+export DEVELOPER_ID_APPLICATION='Developer ID Application: NDRT S.R.L. (VBC8N695XF)'
+export NOTARY_PROFILE='codex-piggy-bank-notary'
 ./script/package_release.sh
 ```
 
