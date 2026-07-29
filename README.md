@@ -1,6 +1,4 @@
-<p align="center">
-  <img src="docs/codex-piggy-bank-icon.png" width="128" alt="Codex Piggy Bank app icon">
-</p>
+<img src="docs/codex-piggy-bank-icon.png" width="128" alt="Codex Piggy Bank app icon">
 
 # Codex Piggy Bank
 
