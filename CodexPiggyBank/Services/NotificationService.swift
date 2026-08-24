@@ -2,7 +2,7 @@ import Foundation
 import UserNotifications
 
 protocol NotificationScheduling: Sendable {
-    func scheduledKeys() async -> Set<String>
+    func enabledKeys() async -> Set<String>
     func toggle(for credit: ResetCredit, now: Date) async throws -> Bool
     func reconcile(validKeys: Set<String>) async
 }
@@ -10,31 +10,51 @@ protocol NotificationScheduling: Sendable {
 actor NotificationService: NotificationScheduling {
     static let leadTimes: [TimeInterval] = [3_600, 600, 300]
 
-    private let center: UNUserNotificationCenter
-
-    init(center: UNUserNotificationCenter = .current()) {
-        self.center = center
+    private enum Keys {
+        static let enabledResetNotifications = "enabledResetNotifications"
     }
 
-    func scheduledKeys() async -> Set<String> {
+    private let center: UNUserNotificationCenter
+    private let defaults: UserDefaults
+
+    init(
+        center: UNUserNotificationCenter = .current(),
+        defaults: UserDefaults = .standard
+    ) {
+        self.center = center
+        self.defaults = defaults
+    }
+
+    func enabledKeys() async -> Set<String> {
+        if let persistedKeys {
+            return persistedKeys
+        }
+
+        // Migrate the previous release, where enabled state only existed as
+        // pending notification requests.
         let requests = await center.pendingNotificationRequests()
-        return Set(
+        let keys = Set(
             requests.compactMap { request in
                 Self.creditKey(from: request.identifier)
             }
         )
+        saveEnabledKeys(keys)
+        return keys
     }
 
     func toggle(for credit: ResetCredit, now: Date = Date()) async throws -> Bool {
+        var enabledKeys = await enabledKeys()
         let existing = await center.pendingNotificationRequests()
         let existingIdentifiers = existing
             .map(\.identifier)
             .filter { Self.belongsToCredit($0, credit: credit) }
 
-        if !existingIdentifiers.isEmpty {
+        if enabledKeys.contains(credit.id) {
             center.removePendingNotificationRequests(
                 withIdentifiers: existingIdentifiers
             )
+            enabledKeys.remove(credit.id)
+            saveEnabledKeys(enabledKeys)
             return false
         }
 
@@ -66,10 +86,16 @@ actor NotificationService: NotificationScheduling {
             )
             try await center.add(request)
         }
+
+        enabledKeys.insert(credit.id)
+        saveEnabledKeys(enabledKeys)
         return true
     }
 
     func reconcile(validKeys: Set<String>) async {
+        let enabledKeys = await enabledKeys().intersection(validKeys)
+        saveEnabledKeys(enabledKeys)
+
         let requests = await center.pendingNotificationRequests()
         let obsolete = requests.compactMap { request -> String? in
             guard let key = Self.creditKey(from: request.identifier) else {
@@ -139,6 +165,17 @@ actor NotificationService: NotificationScheduling {
             return remainder
         }
         return String(remainder[..<separator])
+    }
+
+    private var persistedKeys: Set<String>? {
+        defaults.stringArray(forKey: Keys.enabledResetNotifications).map(Set.init)
+    }
+
+    private func saveEnabledKeys(_ keys: Set<String>) {
+        defaults.set(
+            Array(keys).sorted(),
+            forKey: Keys.enabledResetNotifications
+        )
     }
 
     private func requestAuthorizationIfNeeded() async throws -> Bool {

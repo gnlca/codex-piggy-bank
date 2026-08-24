@@ -9,7 +9,7 @@ final class ResetStore {
     private(set) var isRefreshing = false
     private(set) var isStale = false
     private(set) var errorMessage: String?
-    private(set) var scheduledNotificationKeys: Set<String> = []
+    private(set) var notificationEnabledKeys: Set<String> = []
     private(set) var createdCalendarKeys: Set<String> = []
     private(set) var pendingActionKeys: Set<String> = []
     private(set) var clock = Date()
@@ -150,7 +150,7 @@ final class ResetStore {
                 notifyStatusChange()
             }
 
-            scheduledNotificationKeys = await notifications.scheduledKeys()
+            notificationEnabledKeys = await notifications.enabledKeys()
             createdCalendarKeys = await calendar.createdKeys()
             await refresh()
 
@@ -203,7 +203,7 @@ final class ResetStore {
 
             let validKeys = Set(newSnapshot.sortedResetCredits.map(\.id))
             await notifications.reconcile(validKeys: validKeys)
-            scheduledNotificationKeys = await notifications.scheduledKeys()
+            notificationEnabledKeys = await notifications.enabledKeys()
             createdCalendarKeys = await calendar.createdKeys()
         } catch {
             isStale = snapshot != nil
@@ -222,7 +222,7 @@ final class ResetStore {
 
         do {
             _ = try await notifications.toggle(for: credit, now: clock)
-            scheduledNotificationKeys = await notifications.scheduledKeys()
+            notificationEnabledKeys = await notifications.enabledKeys()
             errorMessage = nil
         } catch {
             errorMessage = friendlyMessage(for: error)
