@@ -72,7 +72,7 @@ private struct ResetCreditRow: View {
     let credit: ResetCredit
 
     private var notificationIsActive: Bool {
-        store.scheduledNotificationKeys.contains(credit.id)
+        store.notificationEnabledKeys.contains(credit.id)
     }
 
     private var calendarWasCreated: Bool {

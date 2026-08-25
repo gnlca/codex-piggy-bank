@@ -17,7 +17,7 @@ A lightweight macOS menu bar app for tracking Codex usage limits and banked rese
 
 1. Download the latest universal DMG from [GitHub Releases](https://github.com/gnlca/codex-piggy-bank/releases/latest).
 2. Open the DMG and drag **Codex Piggy Bank** to **Applications**.
-3. Launch it from Applications. Codex CLI 0.144.0 or later must already be installed and authenticated.
+3. Launch it from Applications. Codex CLI 0.144.0 or later must already be installed and authenticated. The current integration is tested with Codex CLI 0.149.1.
 
 ## Read only by design
 
