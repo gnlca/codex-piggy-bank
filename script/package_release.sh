@@ -2,7 +2,7 @@
 set -euo pipefail
 
 APP_NAME="Codex Piggy Bank"
-VERSION="1.0.1"
+VERSION="1.0.2"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DERIVED_DATA="$ROOT_DIR/.build/ReleaseDerivedData"
 DIST_DIR="$ROOT_DIR/dist"

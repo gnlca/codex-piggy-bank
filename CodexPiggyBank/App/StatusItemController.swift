@@ -38,10 +38,8 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         button.sendAction(on: [.leftMouseUp])
         button.toolTip = "Codex Piggy Bank"
         button.setAccessibilityLabel("Codex Piggy Bank")
-        button.wantsLayer = true
-        button.layer?.cornerCurve = .continuous
-        button.layer?.cornerRadius = 7
-        button.layer?.backgroundColor = NSColor.clear.cgColor
+        button.imagePosition = .imageLeading
+        button.imageScaling = .scaleProportionallyDown
     }
 
     private func configurePopover() {
@@ -67,13 +65,9 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         let textColor = NSColor.labelColor
         let title = NSMutableAttributedString()
 
-        if let piggyBankIcon {
-            title.append(attachment(for: piggyBankIcon, size: 17, yOffset: -3))
-        }
-
         title.append(
             NSAttributedString(
-                string: " \(presentation.leadingText)",
+                string: presentation.leadingText,
                 attributes: [
                     .font: font,
                     .foregroundColor: textColor,
@@ -109,27 +103,19 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
             }
         }
 
-        button.image = nil
+        button.image = piggyBankIcon
         button.attributedTitle = title
         button.toolTip = "\(store.availableResetCount) resets available"
     }
 
     private var piggyBankIcon: NSImage? {
-        guard let source = NSImage(named: "NucleoPiggyBank") else {
+        guard let image = NSImage(named: "NucleoPiggyBank")?.copy() as? NSImage else {
             return nil
         }
 
-        return NSImage(size: NSSize(width: 17, height: 17), flipped: false) { rect in
-            NSColor.white.setFill()
-            rect.fill()
-            source.draw(
-                in: rect,
-                from: .zero,
-                operation: .destinationIn,
-                fraction: 1
-            )
-            return true
-        }
+        image.size = NSSize(width: 17, height: 17)
+        image.isTemplate = true
+        return image
     }
 
     private func attachment(
@@ -198,12 +184,6 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
             return
         }
 
-        button.highlight(false)
-        CATransaction.begin()
-        CATransaction.setAnimationDuration(0.16)
-        button.layer?.backgroundColor = isSelected
-            ? NSColor.labelColor.withAlphaComponent(0.14).cgColor
-            : NSColor.clear.cgColor
-        CATransaction.commit()
+        button.highlight(isSelected)
     }
 }
