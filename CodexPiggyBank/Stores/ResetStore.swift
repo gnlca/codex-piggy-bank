@@ -57,6 +57,10 @@ final class ResetStore {
         snapshot?.sortedResetCredits ?? []
     }
 
+    var weeklyWindow: UsageWindow? {
+        snapshot?.windows.first(where: \.isWeekly)
+    }
+
     var availableResetCount: Int {
         snapshot?.resetSummary?.availableCount ?? 0
     }

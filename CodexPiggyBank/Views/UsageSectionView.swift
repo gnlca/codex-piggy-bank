@@ -13,7 +13,11 @@ struct UsageSectionView: View {
                     .padding(.vertical, 14)
             } else {
                 ForEach(store.windows) { window in
-                    UsageWindowRow(window: window)
+                    if window.isWeekly {
+                        WeeklyUsageRow(window: window)
+                    } else {
+                        UsageWindowRow(window: window)
+                    }
                     if window.id != store.windows.last?.id ||
                         store.snapshot?.individualLimit != nil {
                         Divider()
@@ -127,21 +131,6 @@ private struct IndividualLimitRow: View {
         .padding(.horizontal, 22)
         .padding(.vertical, 11)
         .accessibilityElement(children: .combine)
-    }
-}
-
-private enum UsageProgressColor {
-    static func color(for remainingPercent: Int) -> Color {
-        switch remainingPercent {
-        case ..<15:
-            return .red
-        case ..<40:
-            return .orange
-        case ..<70:
-            return .yellow
-        default:
-            return .green
-        }
     }
 }
 

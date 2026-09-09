@@ -1,4 +1,3 @@
-import AppKit
 import Foundation
 
 struct StatusPresentation: Equatable, Sendable {
@@ -25,21 +24,6 @@ struct StatusPresentation: Equatable, Sendable {
             return "exclamationmark.triangle"
         case .loading, .approaching, .urgent:
             return "timer"
-        }
-    }
-
-    var symbolColor: NSColor {
-        switch state {
-        case .urgent:
-            return .systemRed
-        case .approaching:
-            return .systemOrange
-        case .stale:
-            return .systemOrange
-        case .banked:
-            return .labelColor
-        case .loading, .empty:
-            return .secondaryLabelColor
         }
     }
 

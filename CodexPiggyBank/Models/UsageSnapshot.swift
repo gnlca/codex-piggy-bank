@@ -42,6 +42,10 @@ struct UsageWindow: Codable, Equatable, Identifiable, Sendable {
         min(100, max(0, 100 - usedPercent))
     }
 
+    var isWeekly: Bool {
+        windowDurationMinutes == 10_080
+    }
+
     var displayName: String {
         guard let minutes = windowDurationMinutes else {
             return source == .primary ? "Usage" : "Secondary usage"

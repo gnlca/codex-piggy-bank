@@ -38,7 +38,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         button.sendAction(on: [.leftMouseUp])
         button.toolTip = "Codex Piggy Bank"
         button.setAccessibilityLabel("Codex Piggy Bank")
-        button.imagePosition = .imageLeading
+        button.imagePosition = .imageOnly
         button.imageScaling = .scaleProportionallyDown
     }
 
@@ -46,7 +46,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         popover.behavior = .transient
         popover.animates = true
         popover.delegate = self
-        popover.contentSize = NSSize(width: 380, height: 340)
+        popover.contentSize = NSSize(width: 380, height: 380)
         popover.contentViewController = NSHostingController(
             rootView: PopoverView(store: store)
         )
@@ -58,97 +58,23 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         }
 
         let presentation = store.statusPresentation()
-        let font = NSFont.monospacedDigitSystemFont(
-            ofSize: NSFont.systemFontSize,
-            weight: .medium
-        )
-        let textColor = NSColor.labelColor
-        let title = NSMutableAttributedString()
-
-        title.append(
-            NSAttributedString(
-                string: presentation.leadingText,
-                attributes: [
-                    .font: font,
-                    .foregroundColor: textColor,
-                ]
-            )
-        )
-
-        if !presentation.showsBankSummary {
-            title.append(
-                NSAttributedString(
-                    string: " · ",
-                    attributes: [
-                        .font: font,
-                        .foregroundColor: textColor,
-                    ]
-                )
-            )
-
-            if let image = statusIcon(for: presentation) {
-                title.append(attachment(for: image, size: 15, yOffset: -2))
-            }
-
-            if !presentation.deadline.isEmpty {
-                title.append(
-                    NSAttributedString(
-                        string: " \(presentation.deadline)",
-                        attributes: [
-                            .font: font,
-                            .foregroundColor: textColor,
-                        ]
-                    )
-                )
-            }
+        var summary = "\(store.availableResetCount) resets available"
+        if let weekly = store.weeklyWindow {
+            summary += ", weekly limit: \(weekly.remainingPercent)% left"
+        }
+        if !presentation.deadline.isEmpty {
+            summary += ", next reset expiry: \(presentation.deadline)"
+        }
+        if store.isStale {
+            summary += ", data out of date"
         }
 
-        button.image = piggyBankIcon
-        button.attributedTitle = title
-        button.toolTip = "\(store.availableResetCount) resets available"
-    }
-
-    private var piggyBankIcon: NSImage? {
-        guard let image = NSImage(named: "NucleoPiggyBank")?.copy() as? NSImage else {
-            return nil
-        }
-
-        image.size = NSSize(width: 17, height: 17)
-        image.isTemplate = true
-        return image
-    }
-
-    private func attachment(
-        for image: NSImage,
-        size: CGFloat,
-        yOffset: CGFloat
-    ) -> NSAttributedString {
-        image.isTemplate = false
-        let attachment = NSTextAttachment()
-        attachment.image = image
-        attachment.bounds = NSRect(
-            x: 0,
-            y: yOffset,
-            width: size,
-            height: size
+        button.image = StatusItemContentImage.make(
+            presentation: presentation,
+            weeklyWindow: store.weeklyWindow
         )
-        return NSAttributedString(attachment: attachment)
-    }
-
-    private func statusIcon(for presentation: StatusPresentation) -> NSImage? {
-        return NSImage(
-            systemSymbolName: presentation.symbolName,
-            accessibilityDescription: nil
-        )?.withSymbolConfiguration(
-            NSImage.SymbolConfiguration(
-                pointSize: NSFont.systemFontSize,
-                weight: .medium
-            ).applying(
-                NSImage.SymbolConfiguration(
-                    paletteColors: [presentation.symbolColor]
-                )
-            )
-        )
+        button.toolTip = summary
+        button.setAccessibilityLabel("Codex Piggy Bank, \(summary)")
     }
 
     @objc
