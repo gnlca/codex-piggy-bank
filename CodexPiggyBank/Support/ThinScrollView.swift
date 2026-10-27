@@ -1,101 +1,97 @@
 import AppKit
 import SwiftUI
 
-struct ThinScrollViewConfigurator: NSViewRepresentable {
+struct ThinScrollView<Content: View>: NSViewRepresentable {
     @Binding var verticalOffset: CGFloat
+    let content: Content
 
-    func makeNSView(context: Context) -> NSView {
-        let view = NSView(frame: .zero)
-        configureAfterLayout(from: view, coordinator: context.coordinator)
-        return view
+    init(verticalOffset: Binding<CGFloat>, @ViewBuilder content: () -> Content) {
+        _verticalOffset = verticalOffset
+        self.content = content()
     }
 
-    func updateNSView(_ nsView: NSView, context: Context) {
+    func makeNSView(context: Context) -> NSScrollView {
+        let scrollView = OverlayScrollView()
+        scrollView.drawsBackground = false
+        scrollView.borderType = .noBorder
+        scrollView.hasVerticalScroller = true
+        scrollView.hasHorizontalScroller = false
+        scrollView.autohidesScrollers = true
+        scrollView.scrollerStyle = .overlay
+        scrollView.verticalScroller?.controlSize = .mini
+
+        let document = NSHostingView(rootView: HostedContent(content: content, environment: context.environment))
+        document.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.documentView = document
+        NSLayoutConstraint.activate([
+            document.leadingAnchor.constraint(equalTo: scrollView.contentView.leadingAnchor),
+            document.topAnchor.constraint(equalTo: scrollView.contentView.topAnchor),
+            document.widthAnchor.constraint(equalTo: scrollView.contentView.widthAnchor),
+        ])
+        context.coordinator.attach(to: scrollView)
+        return scrollView
+    }
+
+    func updateNSView(_ scrollView: NSScrollView, context: Context) {
         context.coordinator.verticalOffset = $verticalOffset
-        configureAfterLayout(from: nsView, coordinator: context.coordinator)
+        if let document = scrollView.documentView as? NSHostingView<HostedContent> {
+            document.rootView = HostedContent(content: content, environment: context.environment)
+        }
     }
 
-    func makeCoordinator() -> Coordinator {
-        Coordinator(verticalOffset: $verticalOffset)
+    func makeCoordinator() -> Coordinator { Coordinator(verticalOffset: $verticalOffset) }
+
+    static func dismantleNSView(_ scrollView: NSScrollView, coordinator: Coordinator) {
+        coordinator.detach()
     }
 
-    private func configureAfterLayout(
-        from view: NSView,
-        coordinator: Coordinator
-    ) {
-        DispatchQueue.main.async {
-            var ancestor = view.superview
+    private struct HostedContent: View {
+        let content: Content
+        let environment: EnvironmentValues
 
-            while let current = ancestor {
-                if let scrollView = current as? NSScrollView {
-                    scrollView.scrollerStyle = .overlay
-                    scrollView.autohidesScrollers = true
-                    scrollView.verticalScroller?.controlSize = .mini
-                    coordinator.attach(to: scrollView)
-                    return
-                }
-                ancestor = current.superview
-            }
+        var body: some View {
+            content.environment(\.self, environment).fixedSize(horizontal: false, vertical: true)
         }
     }
 
     @MainActor
     final class Coordinator: NSObject {
         var verticalOffset: Binding<CGFloat>
-
         private weak var scrollView: NSScrollView?
-        private var topOriginY: CGFloat?
 
         init(verticalOffset: Binding<CGFloat>) {
             self.verticalOffset = verticalOffset
         }
 
-        deinit {
-            NotificationCenter.default.removeObserver(self)
-        }
+        deinit { NotificationCenter.default.removeObserver(self) }
 
         func attach(to scrollView: NSScrollView) {
-            guard self.scrollView !== scrollView else {
-                updateOffset()
-                return
-            }
-
-            NotificationCenter.default.removeObserver(self)
             self.scrollView = scrollView
-            topOriginY = scrollView.contentView.bounds.origin.y
             scrollView.contentView.postsBoundsChangedNotifications = true
-
             NotificationCenter.default.addObserver(
-                self,
-                selector: #selector(boundsDidChange),
-                name: NSView.boundsDidChangeNotification,
+                self, selector: #selector(boundsDidChange), name: NSView.boundsDidChangeNotification,
                 object: scrollView.contentView
             )
-            updateOffset()
         }
 
-        @objc
-        private func boundsDidChange() {
-            updateOffset()
+        func detach() {
+            NotificationCenter.default.removeObserver(self)
+            scrollView = nil
         }
 
-        private func updateOffset() {
-            guard let scrollView else {
-                return
+        @objc private func boundsDidChange() {
+            DispatchQueue.main.async { [weak self] in
+                guard let self, let scrollView else { return }
+                let offset = max(scrollView.contentView.bounds.origin.y, 0)
+                if verticalOffset.wrappedValue != offset { verticalOffset.wrappedValue = offset }
             }
-
-            let originY = scrollView.contentView.bounds.origin.y
-            let baseline = topOriginY ?? originY
-            verticalOffset.wrappedValue = max(originY - baseline, 0)
         }
     }
 }
 
-extension View {
-    func thinScrollIndicator(verticalOffset: Binding<CGFloat>) -> some View {
-        background {
-            ThinScrollViewConfigurator(verticalOffset: verticalOffset)
-                .frame(width: 0, height: 0)
-        }
+private final class OverlayScrollView: NSScrollView {
+    override var scrollerStyle: NSScroller.Style {
+        get { super.scrollerStyle }
+        set { super.scrollerStyle = .overlay }
     }
 }

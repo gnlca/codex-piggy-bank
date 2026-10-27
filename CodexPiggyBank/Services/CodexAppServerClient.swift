@@ -3,125 +3,69 @@ import Foundation
 actor CodexAppServerClient {
     private let timeout: Duration
 
-    init(timeout: Duration = .seconds(15)) {
+    init(timeout: Duration = .seconds(20)) {
         self.timeout = timeout
     }
 
-    func readSnapshot(executableURL: URL) async throws -> UsageSnapshot {
-        let session = AppServerSession(
-            executableURL: executableURL,
-            timeout: timeout
+    func readSnapshot(
+        executableURL: URL,
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) async throws -> UsageSnapshot {
+        let connection = CLIConnection(
+            executable: executableURL, arguments: ["app-server", "--stdio"], environment: environment
         )
-        return try await session.readSnapshot()
-    }
-}
-
-private final class AppServerSession: @unchecked Sendable {
-    private let process = Process()
-    private let inputPipe = Pipe()
-    private let outputPipe = Pipe()
-    private let errorPipe = Pipe()
-    private let timeout: Duration
-
-    init(executableURL: URL, timeout: Duration) {
-        self.timeout = timeout
-        process.executableURL = executableURL
-        process.arguments = ["app-server", "--stdio"]
-        process.standardInput = inputPipe
-        process.standardOutput = outputPipe
-        process.standardError = errorPipe
-    }
-
-    func readSnapshot() async throws -> UsageSnapshot {
-        try process.run()
-
-        let sessionTimeout = timeout
-        let timeoutTask = Task { [weak self, sessionTimeout] in
-            try? await Task.sleep(for: sessionTimeout)
-            self?.stop()
-        }
-
-        defer {
-            timeoutTask.cancel()
-            stop()
-        }
-
-        try write(CodexRPC.initialize(version: appVersion))
-
-        do {
-            for try await line in outputPipe.fileHandleForReading.bytes.lines {
+        return try await withTaskCancellationHandler {
+            try connection.start()
+            let deadline = Task {
+                do { try await Task.sleep(for: timeout) } catch { return }
+                connection.stop(timedOut: true)
+            }
+            defer {
+                deadline.cancel()
+                connection.stop()
+            }
+            let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.1.0"
+            try connection.write(CodexRPC.initialize(version: version))
+            var accountLabel: String?
+            for try await line in connection.lines {
+                try Task.checkCancellation()
                 guard let data = line.data(using: .utf8),
                       let object = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-                      let id = (object["id"] as? NSNumber)?.intValue else {
-                    continue
+                      let id = (object["id"] as? NSNumber)?.intValue else { continue }
+                if let error = RPCErrorPayload.from(object) {
+                    throw CodexAppServerError.server(error)
                 }
-
                 if id == 0 {
-                    if let error = RPCErrorPayload.from(object) {
-                        throw CodexAppServerError.server(error)
-                    }
-                    try write(CodexRPC.initialized)
-                    try write(CodexRPC.rateLimitsRead)
-                    continue
+                    try connection.write(CodexRPC.initialized)
+                    try connection.write(CodexRPC.accountRead)
                 }
-
+                if id == 2 {
+                    let result = object["result"] as? [String: Any]
+                    accountLabel = (result?["account"] as? [String: Any])?["email"] as? String
+                    try connection.write(CodexRPC.rateLimitsRead)
+                }
                 if id == 1 {
-                    if let error = RPCErrorPayload.from(object) {
-                        throw CodexAppServerError.server(error)
-                    }
                     let response = try JSONDecoder().decode(RateLimitsEnvelope.self, from: data)
-                    return response.result.snapshot(fetchedAt: Date())
+                    var snapshot = response.result.snapshot(fetchedAt: Date())
+                    snapshot.accountLabel = accountLabel
+                    return snapshot
                 }
             }
-        } catch is CancellationError {
-            throw CodexAppServerError.timedOut
-        } catch let error as CodexAppServerError {
-            throw error
-        } catch {
-            throw CodexAppServerError.invalidResponse(error.localizedDescription)
-        }
-
-        let diagnostics = errorPipe.fileHandleForReading.readDataToEndOfFile()
-        let message = String(data: diagnostics, encoding: .utf8)?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        if let message, !message.isEmpty {
-            throw CodexAppServerError.processFailed(message)
-        }
-        throw CodexAppServerError.timedOut
-    }
-
-    private var appVersion: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0.0"
-    }
-
-    private func write(_ data: Data) throws {
-        try inputPipe.fileHandleForWriting.write(contentsOf: data)
-    }
-
-    private func stop() {
-        try? inputPipe.fileHandleForWriting.close()
-        if process.isRunning {
-            process.terminate()
+            try Task.checkCancellation()
+            if connection.didTimeOut { throw ProviderConnectionError.timedOut(.codex) }
+            throw ProviderConnectionError.unavailable("Codex closed the connection. Check its CLI version and sign-in in Providers.")
+        } onCancel: {
+            connection.stop()
         }
     }
 }
 
 enum CodexAppServerError: LocalizedError, Equatable {
-    case timedOut
-    case invalidResponse(String)
-    case processFailed(String)
     case server(String)
 
     var errorDescription: String? {
         switch self {
-        case .timedOut:
-            return "Codex did not respond within 15 seconds."
-        case let .invalidResponse(message):
-            return "Codex returned an invalid response: \(message)"
-        case let .processFailed(message):
-            return "Codex app-server is unavailable: \(message)"
-        case let .server(message):
-            return "Codex returned an error: \(message)"
+        case let .server(message): "Codex returned an error: \(message)"
         }
     }
 }

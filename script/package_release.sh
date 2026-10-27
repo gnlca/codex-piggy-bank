@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP_NAME="Codex Piggy Bank"
-VERSION="1.0.3"
+APP_NAME="Tokens Piggy Bank"
+VERSION="1.1.0"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DERIVED_DATA="$ROOT_DIR/.build/ReleaseDerivedData"
 DIST_DIR="$ROOT_DIR/dist"
 APP_BUNDLE="$DERIVED_DATA/Build/Products/Release/$APP_NAME.app"
-DMG_PATH="$DIST_DIR/Codex-Piggy-Bank-$VERSION-universal.dmg"
+DMG_PATH="$DIST_DIR/Tokens-Piggy-Bank-$VERSION-universal.dmg"
 STAGING_DIR="$ROOT_DIR/.build/dmg-staging"
 ENTITLEMENTS_PATH="$ROOT_DIR/Configuration/CodexPiggyBank.entitlements"
 

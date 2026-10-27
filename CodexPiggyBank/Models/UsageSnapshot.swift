@@ -6,6 +6,16 @@ struct UsageSnapshot: Codable, Equatable, Sendable {
     let windows: [UsageWindow]
     let individualLimit: IndividualLimit?
     let resetSummary: ResetSummary?
+    var accountLabel: String? = nil
+    var planTier: String? = nil
+    var accountID: String? = nil
+
+    func subscriptionIdentity(for kind: ProviderKind) -> String? {
+        if let accountID { return accountID }
+        guard kind == .codex, ["plus", "prolite", "pro", "promax", "free", "go"].contains(planType ?? ""),
+              let email = accountLabel?.trimmingCharacters(in: .whitespacesAndNewlines), !email.isEmpty else { return nil }
+        return "personal:\(email.lowercased())"
+    }
 
     var sortedResetCredits: [ResetCredit] {
         resetSummary?.credits?.sorted {
@@ -17,7 +27,7 @@ struct UsageSnapshot: Codable, Equatable, Sendable {
             case (nil, _?):
                 return false
             case (nil, nil):
-                return $0.grantedAt < $1.grantedAt
+                return ($0.grantedAt ?? .distantPast) < ($1.grantedAt ?? .distantPast)
             }
         } ?? []
     }
@@ -28,14 +38,17 @@ struct UsageWindow: Codable, Equatable, Identifiable, Sendable {
     let windowDurationMinutes: Int?
     let resetsAt: Date?
     let source: Source
+    var label: String? = nil
+    var bucketID: String? = nil
 
     enum Source: String, Codable, Sendable {
         case primary
         case secondary
+        case model
     }
 
     var id: String {
-        "\(source.rawValue)-\(windowDurationMinutes ?? -1)"
+        bucketID ?? "\(source.rawValue)-\(windowDurationMinutes ?? -1)"
     }
 
     var remainingPercent: Int {
@@ -46,7 +59,14 @@ struct UsageWindow: Codable, Equatable, Identifiable, Sendable {
         windowDurationMinutes == 10_080
     }
 
+    func paceRemainingPercent(now: Date) -> Int? {
+        guard let resetsAt, let minutes = windowDurationMinutes, minutes > 0 else { return nil }
+        let timeRemaining = resetsAt.timeIntervalSince(now) / (Double(minutes) * 60)
+        return Int((min(1, max(0, timeRemaining)) * 100).rounded())
+    }
+
     var displayName: String {
+        if let label { return label }
         guard let minutes = windowDurationMinutes else {
             return source == .primary ? "Usage" : "Secondary usage"
         }
@@ -82,23 +102,25 @@ struct ResetSummary: Codable, Equatable, Sendable {
     let credits: [ResetCredit]?
 
     var missingDetailCount: Int {
-        max(0, availableCount - (credits?.count ?? 0))
+        max(0, availableCount - (credits?.reduce(0) { $0 + $1.count } ?? 0))
     }
 }
 
 struct ResetCredit: Codable, Equatable, Identifiable, Sendable {
     let title: String
     let description: String?
-    let grantedAt: Date
+    let grantedAt: Date?
     let expiresAt: Date?
+    var providerCreditID: String? = nil
+    var quantity: Int? = nil
+
+    var count: Int { max(0, quantity ?? 1) }
 
     var id: String {
-        let granted = Int64(grantedAt.timeIntervalSince1970)
+        if let providerCreditID { return providerCreditID }
+        let granted = Int64(grantedAt?.timeIntervalSince1970 ?? 0)
         let expires = expiresAt.map { String(Int64($0.timeIntervalSince1970)) } ?? "never"
         return "\(granted)-\(expires)"
     }
 
-    var notificationIdentifier: String {
-        "codex-piggy-bank.\(id)"
-    }
 }

@@ -5,25 +5,38 @@ protocol NotificationScheduling: Sendable {
     func enabledKeys() async -> Set<String>
     func toggle(for credit: ResetCredit, now: Date) async throws -> Bool
     func reconcile(validKeys: Set<String>) async
+    func renameProfile(to name: String) async
+}
+
+extension NotificationScheduling {
+    func renameProfile(to name: String) async {}
 }
 
 actor NotificationService: NotificationScheduling {
     static let leadTimes: [TimeInterval] = [3_600, 600, 300]
 
-    private enum Keys {
-        static let enabledResetNotifications = "enabledResetNotifications"
-    }
+    private let preferencesKey: String
+    private let scope: ResetNotificationScope
+    private var profileName: String
 
     private let center: UNUserNotificationCenter
     private let defaults: UserDefaults
 
     init(
+        profileID: String = ProviderProfile.legacyID,
+        profileName: String = "Codex",
         center: UNUserNotificationCenter = .current(),
         defaults: UserDefaults = .standard
     ) {
+        preferencesKey = profileID == ProviderProfile.legacyID
+            ? "enabledResetNotifications" : "enabledResetNotifications.\(profileID)"
+        scope = ResetNotificationScope(profileID: profileID)
+        self.profileName = profileName
         self.center = center
         self.defaults = defaults
     }
+
+    func renameProfile(to name: String) { profileName = name }
 
     func enabledKeys() async -> Set<String> {
         if let persistedKeys {
@@ -35,7 +48,7 @@ actor NotificationService: NotificationScheduling {
         let requests = await center.pendingNotificationRequests()
         let keys = Set(
             requests.compactMap { request in
-                Self.creditKey(from: request.identifier)
+                scope.creditKey(from: request.identifier)
             }
         )
         saveEnabledKeys(keys)
@@ -47,7 +60,7 @@ actor NotificationService: NotificationScheduling {
         let existing = await center.pendingNotificationRequests()
         let existingIdentifiers = existing
             .map(\.identifier)
-            .filter { Self.belongsToCredit($0, credit: credit) }
+            .filter { belongsToCredit($0, credit: credit) }
 
         if enabledKeys.contains(credit.id) {
             center.removePendingNotificationRequests(
@@ -70,7 +83,7 @@ actor NotificationService: NotificationScheduling {
             now: now
         ) {
             let content = UNMutableNotificationContent()
-            content.title = "Codex reset expires \(reminder.leadTime.label)"
+            content.title = "\(profileName) reset expires \(reminder.leadTime.label)"
             content.body = "\(credit.title) expires \(ExpiryFormatting.resetDeadline(expiresAt, now: now))."
             content.sound = .default
 
@@ -80,7 +93,7 @@ actor NotificationService: NotificationScheduling {
                 repeats: false
             )
             let request = UNNotificationRequest(
-                identifier: "\(credit.notificationIdentifier).\(reminder.leadTime.rawValue)",
+                identifier: "\(scope.identifier(for: credit.id)).\(reminder.leadTime.rawValue)",
                 content: content,
                 trigger: trigger
             )
@@ -98,7 +111,7 @@ actor NotificationService: NotificationScheduling {
 
         let requests = await center.pendingNotificationRequests()
         let obsolete = requests.compactMap { request -> String? in
-            guard let key = Self.creditKey(from: request.identifier) else {
+            guard let key = scope.creditKey(from: request.identifier) else {
                 return nil
             }
             return validKeys.contains(key) ? nil : request.identifier
@@ -141,40 +154,22 @@ actor NotificationService: NotificationScheduling {
         ]
     }
 
-    private static func belongsToCredit(
+    private func belongsToCredit(
         _ identifier: String,
         credit: ResetCredit
     ) -> Bool {
-        identifier == credit.notificationIdentifier ||
-            identifier.hasPrefix("\(credit.notificationIdentifier).")
-    }
-
-    private static func creditKey(from identifier: String) -> String? {
-        let prefix = "codex-piggy-bank."
-        guard identifier.hasPrefix(prefix) else {
-            return nil
-        }
-
-        let remainder = String(identifier.dropFirst(prefix.count))
-        guard let separator = remainder.lastIndex(of: ".") else {
-            return remainder
-        }
-
-        let suffix = String(remainder[remainder.index(after: separator)...])
-        guard NotificationLeadTime(rawValue: suffix) != nil else {
-            return remainder
-        }
-        return String(remainder[..<separator])
+        identifier == scope.identifier(for: credit.id) ||
+            identifier.hasPrefix("\(scope.identifier(for: credit.id)).")
     }
 
     private var persistedKeys: Set<String>? {
-        defaults.stringArray(forKey: Keys.enabledResetNotifications).map(Set.init)
+        defaults.stringArray(forKey: preferencesKey).map(Set.init)
     }
 
     private func saveEnabledKeys(_ keys: Set<String>) {
         defaults.set(
             Array(keys).sorted(),
-            forKey: Keys.enabledResetNotifications
+            forKey: preferencesKey
         )
     }
 
@@ -190,6 +185,33 @@ actor NotificationService: NotificationScheduling {
         @unknown default:
             return false
         }
+    }
+}
+
+struct ResetNotificationScope: Sendable {
+    let profileID: String
+
+    private var prefix: String {
+        profileID == ProviderProfile.legacyID ? "codex-piggy-bank." : "tokens-piggy-bank.\(profileID)."
+    }
+
+    func identifier(for creditID: String) -> String { "\(prefix)\(creditID)" }
+
+    func creditKey(from identifier: String) -> String? {
+        guard identifier.hasPrefix(prefix) else {
+            return nil
+        }
+
+        let remainder = String(identifier.dropFirst(prefix.count))
+        guard let separator = remainder.lastIndex(of: ".") else {
+            return remainder
+        }
+
+        let suffix = String(remainder[remainder.index(after: separator)...])
+        guard NotificationLeadTime(rawValue: suffix) != nil else {
+            return remainder
+        }
+        return String(remainder[..<separator])
     }
 }
 
@@ -233,9 +255,9 @@ enum ReminderError: LocalizedError {
         case .notificationsDenied:
             return "Notifications are disabled in System Settings."
         case .calendarDenied:
-            return "Write-only Calendar access was not granted."
+            return "Allow Tokens Piggy Bank to add events in System Settings → Privacy & Security → Calendars, then try again."
         case .calendarFullAccessDenied:
-            return "Full Calendar access is required only to remove the event you created."
+            return "To remove this event, allow full Calendar access for Tokens Piggy Bank in System Settings → Privacy & Security → Calendars, then try again."
         case .calendarUnavailable:
             return "No default calendar is available."
         }

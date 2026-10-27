@@ -2,9 +2,9 @@
 set -euo pipefail
 
 MODE="${1:-run}"
-APP_NAME="Codex Piggy Bank"
+APP_NAME="Tokens Piggy Bank"
 BUNDLE_ID="com.gnlca.codexpiggybank"
-PROCESS_NAME="Codex Piggy Bank"
+PROCESS_NAME="Tokens Piggy Bank"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DERIVED_DATA="$ROOT_DIR/.build/DerivedData"

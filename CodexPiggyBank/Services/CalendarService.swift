@@ -4,26 +4,40 @@ import Foundation
 protocol CalendarEventManaging: Sendable {
     func createdKeys() async -> Set<String>
     func toggleEvent(for credit: ResetCredit, now: Date) async throws -> Bool
+    func renameProfile(to name: String) async
+}
+
+extension CalendarEventManaging {
+    func renameProfile(to name: String) async {}
 }
 
 actor CalendarService: CalendarEventManaging {
     static let alarmOffsets: [TimeInterval] = [-3_600, -600, -300]
 
-    private enum Keys {
-        static let createdResetEvents = "createdResetCalendarEvents"
-        static let eventIdentifiers = "createdResetCalendarEventIdentifiers"
-    }
+    private let createdEventsKey: String
+    private let identifiersKey: String
+    private var profileName: String
+    private let isLegacyProfile: Bool
 
     private let eventStore: EKEventStore
     private let defaults: UserDefaults
 
     init(
+        profileID: String = ProviderProfile.legacyID,
+        profileName: String = "Codex",
         eventStore: EKEventStore = EKEventStore(),
         defaults: UserDefaults = .standard
     ) {
+        isLegacyProfile = profileID == ProviderProfile.legacyID
+        let suffix = isLegacyProfile ? "" : ".\(profileID)"
+        createdEventsKey = "createdResetCalendarEvents\(suffix)"
+        identifiersKey = "createdResetCalendarEventIdentifiers\(suffix)"
+        self.profileName = profileName
         self.eventStore = eventStore
         self.defaults = defaults
     }
+
+    func renameProfile(to name: String) { profileName = name }
 
     func createdKeys() -> Set<String> {
         Set(legacyCreatedKeys).union(eventIdentifiers.keys)
@@ -54,7 +68,7 @@ actor CalendarService: CalendarEventManaging {
         }
 
         let event = EKEvent(eventStore: eventStore)
-        event.title = "Codex reset expiration"
+        event.title = "\(profileName) reset expiration"
         event.notes = "\(credit.title) — \(ExpiryFormatting.resetDeadline(expiresAt, now: now))"
         event.startDate = expiresAt
         event.endDate = expiresAt.addingTimeInterval(300)
@@ -69,11 +83,11 @@ actor CalendarService: CalendarEventManaging {
         if let identifier = event.eventIdentifier {
             var identifiers = eventIdentifiers
             identifiers[credit.id] = identifier
-            defaults.set(identifiers, forKey: Keys.eventIdentifiers)
+            defaults.set(identifiers, forKey: identifiersKey)
         } else {
             var keys = Set(legacyCreatedKeys)
             keys.insert(credit.id)
-            defaults.set(Array(keys).sorted(), forKey: Keys.createdResetEvents)
+            defaults.set(Array(keys).sorted(), forKey: createdEventsKey)
         }
     }
 
@@ -92,18 +106,18 @@ actor CalendarService: CalendarEventManaging {
 
         var identifiers = eventIdentifiers
         identifiers.removeValue(forKey: credit.id)
-        defaults.set(identifiers, forKey: Keys.eventIdentifiers)
+        defaults.set(identifiers, forKey: identifiersKey)
 
         var legacyKeys = Set(legacyCreatedKeys)
         legacyKeys.remove(credit.id)
         defaults.set(
             Array(legacyKeys).sorted(),
-            forKey: Keys.createdResetEvents
+            forKey: createdEventsKey
         )
     }
 
     private func legacyEvent(for credit: ResetCredit) -> EKEvent? {
-        guard let expiresAt = credit.expiresAt else {
+        guard isLegacyProfile, let expiresAt = credit.expiresAt else {
             return nil
         }
 
@@ -145,11 +159,11 @@ actor CalendarService: CalendarEventManaging {
     }
 
     private var eventIdentifiers: [String: String] {
-        defaults.dictionary(forKey: Keys.eventIdentifiers) as? [String: String]
+        defaults.dictionary(forKey: identifiersKey) as? [String: String]
             ?? [:]
     }
 
     private var legacyCreatedKeys: [String] {
-        defaults.stringArray(forKey: Keys.createdResetEvents) ?? []
+        defaults.stringArray(forKey: createdEventsKey) ?? []
     }
 }

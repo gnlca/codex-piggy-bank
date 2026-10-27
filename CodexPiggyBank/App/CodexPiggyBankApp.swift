@@ -3,18 +3,19 @@ import SwiftUI
 import UserNotifications
 
 @main
-struct CodexPiggyBankApp: App {
+struct TokensPiggyBankApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     var body: some Scene {
         Settings {
-            EmptyView()
+            SettingsView(store: appDelegate.providers)
         }
     }
 }
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
+    let providers = ProviderStore()
     private var statusItemController: StatusItemController?
     private var observers: [NSObjectProtocol] = []
 
@@ -22,8 +23,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         NSApp.setActivationPolicy(.accessory)
         UNUserNotificationCenter.current().delegate = self
 
-        let store = ResetStore.live()
-        statusItemController = StatusItemController(store: store)
+        let store = providers
+        statusItemController = StatusItemController(providers: store)
 
         observers.append(
             NSWorkspace.shared.notificationCenter.addObserver(
@@ -32,7 +33,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 queue: .main
             ) { [weak store] _ in
                 Task { @MainActor in
-                    await store?.refresh()
+                    await store?.refreshAll()
                 }
             }
         )

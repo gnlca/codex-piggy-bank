@@ -4,6 +4,7 @@ enum CodexRPC {
     static let allowedOutgoingMethods: Set<String> = [
         "initialize",
         "initialized",
+        "account/read",
         "account/rateLimits/read",
     ]
 
@@ -13,8 +14,8 @@ enum CodexRPC {
             "id": 0,
             "params": [
                 "clientInfo": [
-                    "name": "codex_reset_alert",
-                    "title": "Codex Piggy Bank",
+                    "name": "tokens_piggy_bank",
+                    "title": "Tokens Piggy Bank",
                     "version": version,
                 ],
             ],
@@ -29,6 +30,12 @@ enum CodexRPC {
     static let rateLimitsRead = line([
         "method": "account/rateLimits/read",
         "id": 1,
+    ])
+
+    static let accountRead = line([
+        "method": "account/read",
+        "id": 2,
+        "params": ["refreshToken": false],
     ])
 
     private static func line(_ object: [String: Any]) -> Data {

@@ -48,9 +48,7 @@ enum ExpiryFormatting {
 
     static func compactDeadline(
         _ date: Date,
-        now: Date = Date(),
-        locale: Locale = Locale(identifier: "en_GB"),
-        timeZone: TimeZone = .autoupdatingCurrent
+        now: Date = Date()
     ) -> String {
         let interval = date.timeIntervalSince(now)
         guard interval > 0 else {
@@ -69,18 +67,10 @@ enum ExpiryFormatting {
             let minutes = totalMinutes % 60
             return minutes == 0 ? "\(hours)h" : "\(hours)h \(minutes)m"
         }
-        if interval <= 2 * 86_400 {
-            let totalHours = max(24, Int(interval / 3_600))
-            let days = totalHours / 24
-            let hours = totalHours % 24
-            return hours == 0 ? "\(days)d" : "\(days)d \(hours)h"
-        }
-        return formatted(
-            date,
-            template: "d MMM",
-            locale: locale,
-            timeZone: timeZone
-        )
+        let totalHours = Int(interval / 3_600)
+        let days = totalHours / 24
+        let hours = totalHours % 24
+        return hours == 0 ? "\(days)d" : "\(days)d \(hours)h"
     }
 
     static func usageReset(

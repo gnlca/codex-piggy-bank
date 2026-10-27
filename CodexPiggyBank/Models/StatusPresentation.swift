@@ -3,6 +3,7 @@ import Foundation
 struct StatusPresentation: Equatable, Sendable {
     enum State: Sendable {
         case loading
+        case usage
         case banked
         case approaching
         case urgent
@@ -18,7 +19,7 @@ struct StatusPresentation: Equatable, Sendable {
 
     var symbolName: String {
         switch state {
-        case .banked, .empty:
+        case .banked, .empty, .usage:
             return "building.columns.fill"
         case .stale:
             return "exclamationmark.triangle"
@@ -28,10 +29,10 @@ struct StatusPresentation: Equatable, Sendable {
     }
 
     var showsBankSummary: Bool {
-        state == .banked || state == .empty
+        state == .banked || state == .empty || state == .usage
     }
 
     var leadingText: String {
-        count.map(String.init) ?? "—"
+        state == .usage ? "" : count.map(String.init) ?? "—"
     }
 }

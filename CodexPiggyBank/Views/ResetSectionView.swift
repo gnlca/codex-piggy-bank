@@ -1,67 +1,41 @@
 import SwiftUI
 
-struct ResetSectionView: View {
-    @Bindable var store: ResetStore
+struct BankResetList: View {
+    let stores: [ResetStore]
+    var showsProvider = true
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            if hasVisibleCredits {
-                creditList
-            } else if store.availableResetCount == 0 {
-                emptyState
-            } else {
-                unavailableDetailsState
+        let bank = BankResets(stores: stores)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Text("Banked resets").font(.system(size: 12, weight: .semibold))
+                if bank.count > 0 {
+                    Text(bank.count.formatted()).font(.system(size: 10, weight: .medium)).monospacedDigit()
+                        .padding(.horizontal, 6).padding(.vertical, 2)
+                        .background(.primary.opacity(0.07), in: .capsule)
+                }
+                Spacer()
+                if bank.stores.contains(where: \.isStale) {
+                    Text("Last known").font(.caption2).foregroundStyle(.orange)
+                }
+            }
+            ForEach(bank.entries) { entry in
+                ResetCreditRow(store: entry.store, credit: entry.credit, showsProvider: showsProvider)
+            }
+            ForEach(bank.stores.filter { $0.missingResetDetailCount > 0 }, id: \.profile.id) { store in
+                HStack(spacing: 8) {
+                    if showsProvider { ProviderIcon(profile: store.profile) }
+                    Text("\(store.missingResetDetailCount) resets · expiry details unavailable")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                .padding(.vertical, 8)
+            }
+            if bank.count == 0 {
+                Text(stores.contains(where: \.isRefreshing) ? "Checking reset availability…" : "No banked resets reported.")
+                    .font(.callout).foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 14)
             }
         }
-    }
-
-    private var hasVisibleCredits: Bool {
-        !store.resetCredits.isEmpty
-    }
-
-    private var creditList: some View {
-        VStack(spacing: 8) {
-            ForEach(store.resetCredits) { credit in
-                ResetCreditRow(store: store, credit: credit)
-            }
-
-            if store.missingResetDetailCount > 0 {
-                Text(
-                    "\(store.missingResetDetailCount) \(store.missingResetDetailCount == 1 ? "reset without details" : "resets without details")"
-                )
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 4)
-                .padding(.vertical, 6)
-            }
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 10)
-    }
-
-    private var emptyState: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "checkmark.circle")
-                .foregroundStyle(.green)
-            Text("No resets are expiring.")
-                .font(.callout)
-                .foregroundStyle(.secondary)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
-    }
-
-    private var unavailableDetailsState: some View {
-        HStack(alignment: .top, spacing: 10) {
-            Image(systemName: "calendar.badge.exclamationmark")
-                .foregroundStyle(.orange)
-            Text("Codex reports the reset count, but not their expiration dates. Update Codex CLI to see the details.")
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
     }
 }
 
@@ -70,6 +44,7 @@ private struct ResetCreditRow: View {
 
     @Bindable var store: ResetStore
     let credit: ResetCredit
+    let showsProvider: Bool
 
     private var notificationIsActive: Bool {
         store.notificationEnabledKeys.contains(credit.id)
@@ -88,26 +63,31 @@ private struct ResetCreditRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(credit.title)
-                    .font(.callout.weight(.medium))
-                    .lineLimit(1)
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                if showsProvider {
+                    ProviderIcon(profile: store.profile)
+                        .alignmentGuide(.firstTextBaseline) { _ in 15 }
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) {
+                        Text(credit.title).font(.callout.weight(.medium)).lineLimit(1)
+                        if credit.count > 1 {
+                            Text("×\(credit.count)").font(.caption).monospacedDigit().foregroundStyle(.secondary)
+                        }
+                    }
 
-                Text(deadlineText)
-                    .font(.caption)
-                    .foregroundStyle(deadlineColor)
-                    .animation(
-                        reduceMotion
-                            ? nil
-                            : .easeInOut(duration: 0.25),
-                        value: deadlineState
-                    )
-                    .lineLimit(1)
+                    Text(deadlineText)
+                        .font(.caption).monospacedDigit()
+                        .foregroundStyle(deadlineColor)
+                        .animation(reduceMotion ? nil : .easeInOut(duration: 0.25), value: deadlineState)
+                        .lineLimit(1)
+                        .help(credit.expiresAt.map { ExpiryFormatting.usageReset($0) } ?? "No expiration date")
+                }
             }
 
             Spacer(minLength: 8)
 
-            reminderActions
+            actionButtons
         }
         .frame(maxWidth: .infinity)
         .padding(.horizontal, 14)
@@ -119,19 +99,8 @@ private struct ResetCreditRow: View {
         .accessibilityElement(children: .contain)
     }
 
-    @ViewBuilder
-    private var reminderActions: some View {
-        if #available(macOS 26.0, *) {
-            GlassEffectContainer(spacing: 8) {
-                actionButtons
-            }
-        } else {
-            actionButtons
-        }
-    }
-
     private var actionButtons: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             Button {
                 Task { await store.toggleNotification(for: credit) }
             } label: {
@@ -147,7 +116,7 @@ private struct ResetCreditRow: View {
             .buttonStyle(.plain)
             .disabled(isExpired || credit.expiresAt == nil || store.pendingActionKeys.contains(credit.id))
             .help(notificationIsActive ? "Cancel reset alerts" : "Alert me 1 hour, 10 minutes, and 5 minutes before")
-            .accessibilityLabel(notificationIsActive ? "Cancel reset alerts" : "Create reset alerts")
+            .accessibilityLabel("\(notificationIsActive ? "Cancel reset alerts" : "Create reset alerts") for \(store.profile.name)")
             .accessibilityValue(notificationIsActive ? "On" : "Off")
 
             Button {
@@ -169,7 +138,7 @@ private struct ResetCreditRow: View {
                         (isExpired || credit.expiresAt == nil))
             )
             .help(calendarWasCreated ? "Remove from Calendar" : "Add to Calendar with 3 alerts")
-            .accessibilityLabel(calendarWasCreated ? "Remove from Calendar" : "Add to Calendar")
+            .accessibilityLabel("\(calendarWasCreated ? "Remove from Calendar" : "Add to Calendar") for \(store.profile.name)")
             .accessibilityValue(calendarWasCreated ? "On" : "Off")
         }
     }
@@ -178,7 +147,8 @@ private struct ResetCreditRow: View {
         guard let expiresAt = credit.expiresAt else {
             return "No expiration date"
         }
-        return ExpiryFormatting.resetDeadline(expiresAt, now: store.clock)
+        guard expiresAt > store.clock else { return "Expired" }
+        return "in \(ExpiryFormatting.compactDeadline(expiresAt, now: store.clock))"
     }
 
     private var deadlineState: DeadlineState {
@@ -252,11 +222,11 @@ private struct ReminderToggleLabel: View {
                     )
                     .rotationEffect(.degrees(-90))
                     .animation(
-                        .linear(duration: 0.25),
+                        reduceMotion ? nil : .linear(duration: 0.25),
                         value: ringPresentation.progress
                     )
                     .animation(
-                        .easeInOut(duration: 0.35),
+                        reduceMotion ? nil : .easeInOut(duration: 0.35),
                         value: ringPresentation.level
                     )
             }
@@ -275,7 +245,7 @@ private struct ReminderToggleLabel: View {
             .frame(width: 18, height: 18)
             .animation(toggleAnimation, value: isOn)
         }
-        .frame(width: 38, height: 38)
+        .frame(width: 40, height: 40)
         .contentShape(Circle())
         .accessibilityHidden(true)
     }

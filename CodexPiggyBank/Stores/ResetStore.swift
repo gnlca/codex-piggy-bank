@@ -5,45 +5,48 @@ import Observation
 @MainActor
 @Observable
 final class ResetStore {
+    private(set) var profile: ProviderProfile
     private(set) var snapshot: UsageSnapshot?
     private(set) var isRefreshing = false
     private(set) var isStale = false
     private(set) var errorMessage: String?
+    private(set) var calendarFailure: CalendarFailure?
     private(set) var notificationEnabledKeys: Set<String> = []
     private(set) var createdCalendarKeys: Set<String> = []
     private(set) var pendingActionKeys: Set<String> = []
     private(set) var clock = Date()
 
-    @ObservationIgnored private let client: CodexAppServerClient
+    @ObservationIgnored private let client: any UsageReading
     @ObservationIgnored private let cache: SnapshotCache
-    @ObservationIgnored private let locator: CodexExecutableLocator
     @ObservationIgnored private let notifications: any NotificationScheduling
     @ObservationIgnored private let calendar: any CalendarEventManaging
+    @ObservationIgnored private var requestTask: Task<UsageSnapshot, Error>?
+    @ObservationIgnored private var generation = 0
     @ObservationIgnored private var refreshTask: Task<Void, Never>?
     @ObservationIgnored private var clockTask: Task<Void, Never>?
     @ObservationIgnored var onStatusChange: (() -> Void)?
 
     init(
-        client: CodexAppServerClient,
+        profile: ProviderProfile,
+        client: any UsageReading,
         cache: SnapshotCache,
-        locator: CodexExecutableLocator,
         notifications: any NotificationScheduling,
         calendar: any CalendarEventManaging
     ) {
+        self.profile = profile
         self.client = client
         self.cache = cache
-        self.locator = locator
         self.notifications = notifications
         self.calendar = calendar
     }
 
-    static func live() -> ResetStore {
+    static func live(profile: ProviderProfile) -> ResetStore {
         ResetStore(
-            client: CodexAppServerClient(),
-            cache: SnapshotCache(),
-            locator: CodexExecutableLocator(),
-            notifications: NotificationService(),
-            calendar: CalendarService()
+            profile: profile,
+            client: ProviderUsageClient(),
+            cache: SnapshotCache(profileID: profile.storageID),
+            notifications: NotificationService(profileID: profile.storageID, profileName: profile.name),
+            calendar: CalendarService(profileID: profile.storageID, profileName: profile.name)
         )
     }
 
@@ -54,15 +57,19 @@ final class ResetStore {
     }
 
     var resetCredits: [ResetCredit] {
-        snapshot?.sortedResetCredits ?? []
+        snapshot?.sortedResetCredits.filter { $0.count > 0 && ($0.expiresAt.map { $0 > clock } ?? true) } ?? []
     }
 
     var weeklyWindow: UsageWindow? {
-        snapshot?.windows.first(where: \.isWeekly)
+        snapshot?.windows.first { $0.isWeekly && $0.source != .model }
+    }
+
+    var overviewWindows: [UsageWindow] {
+        windows.filter { $0.source != .model && ($0.windowDurationMinutes == 300 || $0.isWeekly) }
     }
 
     var availableResetCount: Int {
-        snapshot?.resetSummary?.availableCount ?? 0
+        resetCredits.reduce(0) { $0 + $1.count } + missingResetDetailCount
     }
 
     var missingResetDetailCount: Int {
@@ -74,31 +81,49 @@ final class ResetStore {
             ?? "Waiting for the first update"
     }
 
+    var capacity: PlanCapacity { PlanCapacity(profile: profile, snapshot: snapshot) }
+
+    func setAccentColor(_ hex: String?) {
+        profile.accentHex = hex
+    }
+
+    func rename(to name: String) async {
+        profile.name = name
+        await notifications.renameProfile(to: name)
+        await calendar.renameProfile(to: name)
+    }
+
+    var signInLabel: String { snapshot != nil || profile.t3InstanceID != nil ? "Sign in again…" : "Sign in…" }
+
     var connectionLabel: String {
-        if locator.resolve() == nil {
-            return "Codex not found"
+        if ProviderExecutableLocator.resolve(profile) == nil {
+            return "\(profile.kind.title) not found"
         }
+        if !profile.isEnabled { return "Paused" }
+        if errorMessage != nil && snapshot == nil { return "Connection failed" }
         if isStale {
             return "Data out of date"
         }
         if snapshot != nil {
-            return "Codex connected"
+            return "Signed in"
         }
-        return "Connecting to Codex"
+        return "Connecting to \(profile.kind.title)"
     }
 
     var connectionColor: NSColor {
-        if locator.resolve() == nil {
+        if ProviderExecutableLocator.resolve(profile) == nil {
             return .systemRed
         }
+        if !profile.isEnabled { return .secondaryLabelColor }
+        if errorMessage != nil { return .systemOrange }
         if isStale {
             return .systemOrange
         }
         return snapshot == nil ? .secondaryLabelColor : .systemGreen
     }
 
-    var codexPath: String? {
-        locator.resolve()?.path
+    var executablePath: String? {
+        ProviderExecutableLocator.resolve(profile)?.path
     }
 
     func statusPresentation(now: Date? = nil) -> StatusPresentation {
@@ -114,6 +139,9 @@ final class ResetStore {
             .compactMap(\.expiresAt)
             .first(where: { $0 > now })
 
+        if snapshot.resetSummary == nil, !isStale {
+            return StatusPresentation(count: nil, deadline: "", state: .usage)
+        }
         if isStale {
             return StatusPresentation(count: count, deadline: "", state: .stale)
         }
@@ -141,19 +169,20 @@ final class ResetStore {
     }
 
     func start() {
-        guard refreshTask == nil, clockTask == nil else {
+        guard profile.isEnabled, refreshTask == nil, clockTask == nil else {
             return
         }
 
         refreshTask = Task { [weak self] in
             guard let self else { return }
 
-            if let cached = await cache.load() {
+            if let cached = await cache.load(), !Task.isCancelled, snapshot == nil {
                 snapshot = cached
                 isStale = true
                 notifyStatusChange()
             }
 
+            guard !Task.isCancelled else { return }
             notificationEnabledKeys = await notifications.enabledKeys()
             createdCalendarKeys = await calendar.createdKeys()
             await refresh()
@@ -176,6 +205,9 @@ final class ResetStore {
     }
 
     func stop() {
+        generation += 1
+        requestTask?.cancel()
+        requestTask = nil
         refreshTask?.cancel()
         clockTask?.cancel()
         refreshTask = nil
@@ -183,21 +215,16 @@ final class ResetStore {
     }
 
     func refresh() async {
-        guard !isRefreshing else {
-            return
-        }
-        guard let executableURL = locator.resolve() else {
-            errorMessage = "Codex CLI was not found. Select the codex executable."
-            isStale = snapshot != nil
-            notifyStatusChange()
-            return
-        }
-
+        guard profile.isEnabled, !isRefreshing else { return }
+        let currentGeneration = generation
         isRefreshing = true
-        defer { isRefreshing = false }
+        defer { isRefreshing = false; requestTask = nil }
 
         do {
-            let newSnapshot = try await client.readSnapshot(executableURL: executableURL)
+            let task = Task { try await client.readSnapshot(for: profile) }
+            requestTask = task
+            let newSnapshot = try await task.value
+            guard currentGeneration == generation, !Task.isCancelled else { return }
             snapshot = newSnapshot
             isStale = false
             errorMessage = nil
@@ -205,12 +232,13 @@ final class ResetStore {
 
             try? await cache.save(newSnapshot)
 
-            let validKeys = Set(newSnapshot.sortedResetCredits.map(\.id))
+            let validKeys = Set(resetCredits.map(\.id))
             await notifications.reconcile(validKeys: validKeys)
             notificationEnabledKeys = await notifications.enabledKeys()
             createdCalendarKeys = await calendar.createdKeys()
         } catch {
-            isStale = snapshot != nil
+            guard currentGeneration == generation, !Task.isCancelled else { return }
+            isStale = true
             errorMessage = friendlyMessage(for: error)
         }
 
@@ -239,36 +267,32 @@ final class ResetStore {
         }
         pendingActionKeys.insert(credit.id)
         defer { pendingActionKeys.remove(credit.id) }
+        calendarFailure = nil
 
         do {
             _ = try await calendar.toggleEvent(for: credit, now: clock)
             createdCalendarKeys = await calendar.createdKeys()
             errorMessage = nil
         } catch {
-            errorMessage = friendlyMessage(for: error)
+            let needsAccess: Bool
+            switch error as? ReminderError {
+            case .calendarDenied, .calendarFullAccessDenied: needsAccess = true
+            default: needsAccess = false
+            }
+            calendarFailure = CalendarFailure(message: friendlyMessage(for: error), needsAccess: needsAccess)
         }
     }
 
-    func chooseCodexExecutable() {
-        let panel = NSOpenPanel()
-        panel.title = "Select the Codex executable"
-        panel.message = "Choose the “codex” executable."
-        panel.prompt = "Select"
-        panel.canChooseFiles = true
-        panel.canChooseDirectories = false
-        panel.allowsMultipleSelection = false
+    func dismissCalendarFailure() { calendarFailure = nil }
 
-        guard panel.runModal() == .OK, let url = panel.url else {
-            return
-        }
+    struct CalendarFailure {
+        let message: String
+        let needsAccess: Bool
+    }
 
-        do {
-            try locator.select(url)
-            errorMessage = nil
-            Task { await refresh() }
-        } catch {
-            errorMessage = friendlyMessage(for: error)
-        }
+    func clearNotifications() async {
+        await notifications.reconcile(validKeys: [])
+        notificationEnabledKeys = []
     }
 
     func dismissError() {
