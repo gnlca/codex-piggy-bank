@@ -32,6 +32,7 @@ struct ClaudeUsageClient: Sendable {
 
             try connection.write(Self.request(id: "initialize", subtype: "initialize"))
             var accountLabel: String?
+            var version: String?
             for try await line in connection.lines {
                 try Task.checkCancellation()
                 guard let data = line.data(using: .utf8),
@@ -49,6 +50,7 @@ struct ClaudeUsageClient: Sendable {
                 }
                 if id == "initialize" {
                     accountLabel = (payload["account"] as? [String: Any])?["email"] as? String
+                    version = payload["claude_code_version"] as? String
                     try connection.write(Self.request(id: "usage", subtype: "get_usage"))
                     continue
                 }
@@ -58,6 +60,10 @@ struct ClaudeUsageClient: Sendable {
                 if let metadata = ClaudeAccountMetadata.read(environment: environment, email: accountLabel) {
                     snapshot.planTier = metadata.userRateLimitTier ?? metadata.organizationRateLimitTier
                     snapshot.accountID = metadata.identity
+                }
+                // After get_usage, whose request has already refreshed this login if needed.
+                if let block = await ClaudeResetCreditsReader().readBlock(environment: environment, version: version) {
+                    snapshot.resetSummary = Self.resetCredits(block: block, now: snapshot.fetchedAt)
                 }
                 return snapshot
             }
@@ -108,8 +114,12 @@ struct ClaudeUsageClient: Sendable {
     static func decodeResetCredits(_ data: Data, now: Date) -> ResetSummary? {
         guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let limits = root["rate_limits"] as? [String: Any],
-              let block = limits["cedar_ember"] as? [String: Any],
-              block["eligible"] as? Bool == true else { return nil }
+              let block = limits["cedar_ember"] as? [String: Any] else { return nil }
+        return resetCredits(block: block, now: now)
+    }
+
+    static func resetCredits(block: [String: Any], now: Date) -> ResetSummary? {
+        guard block["eligible"] as? Bool == true else { return nil }
         let grants = (block["grants"] as? [[String: Any]] ?? []).compactMap { raw -> ResetCredit? in
             guard let data = try? JSONSerialization.data(withJSONObject: raw),
                   let grant = try? JSONDecoder().decode(Grant.self, from: data),

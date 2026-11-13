@@ -2,7 +2,7 @@
 set -euo pipefail
 
 APP_NAME="Tokens Piggy Bank"
-VERSION="1.2.0"
+VERSION="1.2.1"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DERIVED_DATA="$ROOT_DIR/.build/ReleaseDerivedData"
 DIST_DIR="$ROOT_DIR/dist"

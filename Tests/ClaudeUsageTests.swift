@@ -43,6 +43,31 @@ struct ClaudeUsageTests {
         #expect(summary.availableCount == 7)
     }
 
+    @Test func readsBankedResetsFromTheUsageEndpointBlock() throws {
+        let block = try #require(JSONSerialization.jsonObject(with: Data(#"""
+        {"eligible":true,"next_grant_id":"full-reset-2611","grants":[
+          {"id":"full-reset-2611","resets_left":1,"usable_now":true,"paused":false,"type":"full",
+           "gives_back_weekly":false,"clears":["five_hour","seven_day","seven_day_overage_included"],
+           "ends_at":"2026-12-10T22:00:00+00:00"},
+          {"id":"launch-2610-fable","resets_left":1,"usable_now":true,"paused":false,"type":"full",
+           "gives_back_weekly":true,"clears":["five_hour","seven_day_overage_included"],
+           "ends_at":"2027-03-09T07:59:00+00:00"}
+        ]}
+        """#.utf8)) as? [String: Any])
+        let summary = try #require(ClaudeUsageClient.resetCredits(block: block, now: Date(timeIntervalSince1970: 1_794_000_000)))
+        #expect(summary.credits?.map(\.title) == ["Full reset", "Fable reset"])
+        #expect(summary.availableCount == 2)
+    }
+
+    @Test func findsTheLoginClaudeCodeUsesForEachAccount() {
+        #expect(ClaudeResetCreditsReader.keychainService(configDirectory: nil) == "Claude Code-credentials")
+        #expect(ClaudeResetCreditsReader.keychainService(
+            configDirectory: "/Users/gnlca/Documents/Github/Work/ProfessionAi/.claude-provider-profession_ai"
+        ) == "Claude Code-credentials-ab7c9a2d")
+        #expect(ClaudeResetCreditsReader.accessToken(fromCredentials: Data(#"{"claudeAiOauth":{"accessToken":" t "}}"#.utf8)) == "t")
+        #expect(ClaudeResetCreditsReader.accessToken(fromCredentials: Data(#"{"claudeAiOauth":{}}"#.utf8)) == nil)
+    }
+
     @Test(arguments: [
         #"{"rate_limits_available":false,"rate_limits":null}"#,
         #"{"rate_limits_available":true,"rate_limits":null}"#,

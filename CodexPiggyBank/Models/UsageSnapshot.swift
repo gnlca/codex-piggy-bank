@@ -5,7 +5,7 @@ struct UsageSnapshot: Codable, Equatable, Sendable {
     let planType: String?
     let windows: [UsageWindow]
     let individualLimit: IndividualLimit?
-    let resetSummary: ResetSummary?
+    var resetSummary: ResetSummary?
     var accountLabel: String? = nil
     var planTier: String? = nil
     var accountID: String? = nil

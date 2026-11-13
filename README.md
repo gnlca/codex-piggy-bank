@@ -35,7 +35,7 @@ Double-click an account's name in **Providers** to rename it inline. Return or l
 
 Each account has separate cached usage and reset reminder identifiers. Pausing or removing an account cancels its pending notifications; it keeps the CLI login and previously created Calendar events. Editing an account folder starts a separate usage cache.
 
-Claude requires a version of Claude Code that supports the experimental `get_usage` control request; tested with 2.1.308. API-key-only logins and unavailable subscription limits are shown as unavailable, never as unused quota. Claude reset grants are read from `get_usage` when its `cedar_ember` block reports eligible, usable credits and a confirmed next grant. Unreported credits are not inferred. Each grant is labeled by what it refills, following [T3 Code's grouping](https://github.com/pingdotgg/t3code/blob/9e1f81c78894270c7e281c78402a69a1a97c4474/apps/server/src/provider/claudeResetCredits.ts#L102-L125): **Fable reset** when it gives back weekly usage, otherwise its declared type or the limits it clears (**5-hour**, **Weekly**, or **Full reset**). Hover a reset's name for what it refills.
+Claude requires a version of Claude Code that supports the experimental `get_usage` control request; tested with 2.1.308. API-key-only logins and unavailable subscription limits are shown as unavailable, never as unused quota. Claude reset grants come from the same usage endpoint Claude Code uses for them (`/api/oauth/usage?cedar_ember=1`), because `get_usage` does not include them. They are shown when the `cedar_ember` block reports eligible, usable credits and a confirmed next grant. Unreported credits are not inferred. Each grant is labeled by what it refills, following [T3 Code's grouping](https://github.com/pingdotgg/t3code/blob/9e1f81c78894270c7e281c78402a69a1a97c4474/apps/server/src/provider/claudeResetCredits.ts#L102-L125): **Fable reset** when it gives back weekly usage, otherwise its declared type or the limits it clears (**5-hour**, **Weekly**, or **Full reset**). Hover a reset's name for what it refills.
 
 ## Global weekly average
 
@@ -47,7 +47,7 @@ Plan names and 5× / 20× tiers are descriptive labels only. They never affect t
 
 ## Data access
 
-Codex usage is read through `account/read` and `account/rateLimits/read`. Claude uses a short-lived CLI control connection with `initialize` and `get_usage`, skipping transcript analysis. Usage checks send no prompts, disable Claude hooks and tools, and do not consume reset credits. The app does not store credentials or update either CLI. Login starts only when you choose **Sign in…** or **Sign in again…** and is handled by the provider's CLI in Terminal.
+Codex usage is read through `account/read` and `account/rateLimits/read`. Claude uses a short-lived CLI control connection with `initialize` and `get_usage`, skipping transcript analysis. Claude reset grants are then read with the account's existing Claude Code login, taken from the macOS Keychain with `security` as Claude Code does (or its `.credentials.json` elsewhere); the token is used in memory for that one request. Usage checks send no prompts, disable Claude hooks and tools, and do not consume reset credits. The app does not store credentials or update either CLI. Login starts only when you choose **Sign in…** or **Sign in again…** and is handled by the provider's CLI in Terminal.
 
 ## Build and test
 
