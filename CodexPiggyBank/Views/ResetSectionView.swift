@@ -71,6 +71,7 @@ private struct ResetCreditRow: View {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 6) {
                         Text(credit.title).font(.callout.weight(.medium)).lineLimit(1)
+                            .help(credit.description ?? credit.title)
                         if credit.count > 1 {
                             Text("×\(credit.count)").font(.caption).monospacedDigit().foregroundStyle(.secondary)
                         }

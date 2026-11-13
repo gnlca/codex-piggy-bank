@@ -120,7 +120,8 @@ struct ClaudeUsageClient: Sendable {
                 guard let parsed = claudeDate(date), parsed > now else { return nil }
                 expiresAt = parsed
             }
-            return ResetCredit(title: "Full reset", description: nil, grantedAt: nil, expiresAt: expiresAt,
+            let kind = ResetKind(grant: raw)
+            return ResetCredit(title: kind.title, description: kind.description, grantedAt: nil, expiresAt: expiresAt,
                                providerCreditID: "claude-\(grant.id)", quantity: grant.resets_left)
         }
         guard let next = block["next_grant_id"] as? String,
@@ -136,6 +137,42 @@ struct ClaudeUsageClient: Sendable {
         let ends_at: String?
         let paused: Bool?
         let usable_now: Bool?
+    }
+
+    enum ResetKind: String {
+        case session, weekly, fable, full
+
+        // Claude Code's grouping, as in T3 Code: weekly give-back means Fable, else the declared type, else what it clears.
+        init(grant: [String: Any]) {
+            if grant["gives_back_weekly"] as? Bool == true {
+                self = .fable
+            } else if let type = grant["type"] as? String, let kind = ResetKind(rawValue: type), kind != .fable {
+                self = kind
+            } else {
+                let clears = grant["clears"] as? [Any] ?? []
+                let session = clears.contains { $0 as? String == "five_hour" }
+                let other = clears.contains { $0 as? String != "five_hour" }
+                self = session && !other ? .session : other && !session ? .weekly : .full
+            }
+        }
+
+        var title: String {
+            switch self {
+            case .session: "5-hour reset"
+            case .weekly: "Weekly reset"
+            case .fable: "Fable reset"
+            case .full: "Full reset"
+            }
+        }
+
+        var description: String {
+            switch self {
+            case .session: "Refills your 5-hour limit."
+            case .weekly: "Refills your weekly limit."
+            case .fable: "Refills your Fable allowance and gives back what Fable used on your weekly limit. It doesn't reset your whole week."
+            case .full: "Refills your 5-hour and weekly limits."
+            }
+        }
     }
 }
 

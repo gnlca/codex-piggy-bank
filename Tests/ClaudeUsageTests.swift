@@ -21,6 +21,28 @@ struct ClaudeUsageTests {
         #expect(snapshot.resetSummary == nil)
     }
 
+    @Test func classifiesResetGrantsByKind() throws {
+        let data = Data(#"""
+        {"rate_limits_available":true,"rate_limits":{
+          "seven_day":{"utilization":10},
+          "cedar_ember":{"eligible":true,"next_grant_id":"weekly_a","grants":[
+            {"id":"weekly_a","resets_left":1,"usable_now":true,"clears":["seven_day"],"ends_at":"2026-12-10T22:00:00Z"},
+            {"id":"fable_a","resets_left":1,"usable_now":true,"clears":["seven_day_overage_included"],"gives_back_weekly":true},
+            {"id":"fable_b","resets_left":2,"usable_now":true,"gives_back_weekly":true,"type":"weekly"},
+            {"id":"session_a","resets_left":1,"usable_now":true,"type":"session"},
+            {"id":"full_a","resets_left":1,"usable_now":true,"clears":["five_hour","seven_day"]},
+            {"id":"odd","resets_left":1,"usable_now":true,"type":7,"clears":[1]}
+          ]}
+        }}
+        """#.utf8)
+        let summary = try #require(try ClaudeUsageClient.decodeUsage(data, now: Date(timeIntervalSince1970: 1_790_000_000)).resetSummary)
+        #expect(summary.credits?.map(\.title) == [
+            "Weekly reset", "Fable reset", "Fable reset", "5-hour reset", "Full reset", "Weekly reset",
+        ])
+        #expect(summary.credits?[1].description?.contains("doesn't reset your whole week") == true)
+        #expect(summary.availableCount == 7)
+    }
+
     @Test(arguments: [
         #"{"rate_limits_available":false,"rate_limits":null}"#,
         #"{"rate_limits_available":true,"rate_limits":null}"#,
