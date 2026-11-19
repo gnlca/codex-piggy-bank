@@ -18,6 +18,10 @@ struct ProviderUsageClient: UsageReading {
             return try await ClaudeUsageClient().readSnapshot(
                 executableURL: executable, environment: profile.environment
             )
+        case .antigravity:
+            return try await AntigravityUsageClient().readSnapshot(
+                executableURL: executable, environment: profile.environment
+            )
         }
     }
 }

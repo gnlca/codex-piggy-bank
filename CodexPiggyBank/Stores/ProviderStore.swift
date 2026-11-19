@@ -233,7 +233,7 @@ enum ProviderSettingsError: LocalizedError {
         case .duplicateAccount: "This account folder is already configured. Choose a separate folder for another subscription."
         case .invalidConfiguration: "The saved provider configuration is invalid."
         case .updateInProgress: "Wait for the current provider change to finish."
-        case .noT3Providers: "No Codex or Claude providers were found in T3 Code settings."
+        case .noT3Providers: "No Codex, Claude or Antigravity providers were found in T3 Code settings."
         }
     }
 }

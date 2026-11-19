@@ -29,11 +29,16 @@ enum ProviderLogin {
     }
 
     static func loginCommand(_ profile: ProviderProfile, executable: URL) -> String {
-        let arguments = profile.kind == .codex ? "login" : "auth login"
+        // Antigravity asks to sign in when it starts without a saved login.
+        let arguments = switch profile.kind {
+        case .codex: " login"
+        case .claude: " auth login"
+        case .antigravity: ""
+        }
         let variable = profile.kind.configurationVariable
         let configuration = profile.environment[variable].map { "\(variable)=\(quote($0))" }
             ?? "-u \(variable)"
-        return "/usr/bin/env \(configuration) \(quote(executable.path)) \(arguments)"
+        return "/usr/bin/env \(configuration) \(quote(executable.path))\(arguments)"
     }
 
     private static func quote(_ value: String) -> String {

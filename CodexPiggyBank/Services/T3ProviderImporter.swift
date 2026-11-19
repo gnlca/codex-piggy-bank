@@ -12,6 +12,8 @@ enum T3ProviderImporter {
             switch entry.driver {
             case "codex": kind = .codex
             case "claudeAgent", "claude": kind = .claude
+            // T3 keeps Antigravity's profile under its own folder; the Google sign-in is in the Keychain.
+            case "antigravity": kind = .antigravity
             default: return nil
             }
             let name = entry.displayName?.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -20,11 +22,13 @@ enum T3ProviderImporter {
             profile.accentHex = entry.accentColor
             profile.isEnabled = entry.enabled ?? true
             let config = entry.config
-            profile.configurationDirectory = kind == .codex
-                ? config?.shadowHomePath ?? config?.homePath ?? ""
-                : config?.homePath ?? ""
+            profile.configurationDirectory = switch kind {
+            case .codex: config?.shadowHomePath ?? config?.homePath ?? ""
+            case .claude: config?.homePath ?? ""
+            case .antigravity: ""
+            }
             let binary = config?.binaryPath ?? ""
-            profile.executablePath = ["codex", "claude"].contains(binary) ? "" : binary
+            profile.executablePath = ["codex", "claude", "agy"].contains(binary) ? "" : binary
             return profile
         }
         for profile in profiles {

@@ -140,6 +140,7 @@ struct AccountUsageView: View {
 
     private func limitTitle(for window: UsageWindow) -> String {
         if window.source == .model { return window.displayName.replacingOccurrences(of: "Weekly · ", with: "") }
+        if let label = window.label { return label }
         if window.isWeekly { return "Weekly limit" }
         if window.windowDurationMinutes == 300 { return "5h limit" }
         return "\(window.displayName) limit"

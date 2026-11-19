@@ -4,11 +4,35 @@ import Foundation
 enum ProviderKind: String, Codable, CaseIterable, Identifiable, Sendable {
     case codex
     case claude
+    case antigravity
 
     var id: String { rawValue }
-    var title: String { self == .codex ? "Codex" : "Claude" }
-    var configurationVariable: String { self == .codex ? "CODEX_HOME" : "CLAUDE_CONFIG_DIR" }
-    var defaultDirectory: String { self == .codex ? "~/.codex" : "~/.claude" }
+
+    var title: String {
+        switch self {
+        case .codex: "Codex"
+        case .claude: "Claude"
+        case .antigravity: "Antigravity"
+        }
+    }
+
+    var configurationVariable: String {
+        switch self {
+        case .codex: "CODEX_HOME"
+        case .claude: "CLAUDE_CONFIG_DIR"
+        case .antigravity: "GEMINI_HOME"
+        }
+    }
+
+    var defaultDirectory: String {
+        switch self {
+        case .codex: "~/.codex"
+        case .claude: "~/.claude"
+        case .antigravity: "~/.gemini"
+        }
+    }
+
+    var executableName: String { self == .antigravity ? "agy" : rawValue }
 }
 
 struct ProviderProfile: Codable, Equatable, Identifiable, Sendable {
@@ -68,7 +92,10 @@ struct ProviderProfile: Codable, Equatable, Identifiable, Sendable {
 
     static func new(kind: ProviderKind) -> ProviderProfile {
         var profile = ProviderProfile(name: kind.title, kind: kind)
-        profile.configurationDirectory = "~/Library/Application Support/Tokens Piggy Bank/Accounts/\(profile.id)"
+        // Antigravity keeps one Google sign-in in the Keychain, whatever its folder.
+        if kind != .antigravity {
+            profile.configurationDirectory = "~/Library/Application Support/Tokens Piggy Bank/Accounts/\(profile.id)"
+        }
         return profile
     }
 }

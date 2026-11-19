@@ -35,34 +35,12 @@ struct ClaudeResetCreditsReader: Sendable {
 
     private static func accessToken(environment: [String: String]) async -> String? {
         let configDirectory = environment["CLAUDE_CONFIG_DIR"]
-        if let data = await keychainCredentials(service: keychainService(configDirectory: configDirectory)),
+        if let data = await ProcessRunner.keychainPassword(service: keychainService(configDirectory: configDirectory)),
            let token = accessToken(fromCredentials: data) {
             return token
         }
         let directory = configDirectory ?? "\(NSHomeDirectory())/.claude"
         let file = URL(fileURLWithPath: (directory as NSString).expandingTildeInPath).appendingPathComponent(".credentials.json")
         return (try? Data(contentsOf: file)).flatMap(accessToken(fromCredentials:))
-    }
-
-    /// Uses `security`, as Claude Code does, so the login item's existing Keychain access applies.
-    private static func keychainCredentials(service: String) async -> Data? {
-        let process = Process()
-        let output = Pipe()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/security")
-        process.arguments = ["find-generic-password", "-a", NSUserName(), "-w", "-s", service]
-        process.standardOutput = output
-        process.standardError = FileHandle.nullDevice
-        return await withCheckedContinuation { continuation in
-            process.terminationHandler = { process in
-                let data = output.fileHandleForReading.readDataToEndOfFile()
-                continuation.resume(returning: process.terminationStatus == 0 ? data : nil)
-            }
-            do { try process.run() } catch {
-                process.terminationHandler = nil
-                continuation.resume(returning: nil)
-                return
-            }
-            DispatchQueue.global().asyncAfter(deadline: .now() + 2) { if process.isRunning { process.terminate() } }
-        }
     }
 }

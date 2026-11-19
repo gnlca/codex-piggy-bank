@@ -32,7 +32,7 @@ struct ProvidersView: View {
                 VStack(spacing: 0) {
                     if store.profiles.isEmpty {
                         ContentUnavailableView("Add your first account", systemImage: "person.crop.circle.badge.plus",
-                                               description: Text("Connect Codex or Claude using a new or existing CLI sign-in."))
+                                               description: Text("Connect Codex, Claude or Antigravity using a new or existing CLI sign-in."))
                     }
                     ForEach(store.profiles) { profile in
                         if let usage = store.stores[profile.id] {

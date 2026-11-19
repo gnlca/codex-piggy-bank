@@ -4,7 +4,7 @@ struct ProviderMark: View {
     let kind: ProviderKind
 
     var body: some View {
-        Image(kind == .codex ? "CodexMark" : "ClaudeMark")
+        Image(kind == .codex ? "CodexMark" : kind == .claude ? "ClaudeMark" : "AntigravityMark")
             .resizable().renderingMode(kind == .codex ? .template : .original)
             .scaledToFit().accessibilityLabel(kind.title)
     }

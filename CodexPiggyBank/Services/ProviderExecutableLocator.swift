@@ -9,7 +9,7 @@ enum ProviderExecutableLocator {
         }
 
         let paths = (profile.environment["PATH"] ?? "").split(separator: ":")
-            .map { "\($0)/\(profile.kind.rawValue)" }
+            .map { "\($0)/\(profile.kind.executableName)" }
         let bundled = profile.kind == .codex ? ["/Applications/Codex.app/Contents/Resources/codex"] : []
         return (paths + bundled).first(where: FileManager.default.isExecutableFile(atPath:))
             .map { URL(fileURLWithPath: $0) }

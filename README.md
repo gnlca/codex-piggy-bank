@@ -2,13 +2,13 @@
 
 # Tokens Piggy Bank
 
-A native macOS menu bar app for tracking Codex and Claude subscriptions, usage limits, and banked reset expiration times.
+A native macOS menu bar app for tracking Codex, Claude and Antigravity subscriptions, usage limits, and banked reset expiration times.
 
 Previously Codex Piggy Bank. Existing preferences, notifications, and Calendar event references are preserved.
 
 ## Features
 
-- Track multiple Codex and Claude accounts, each with its own configuration and cached usage.
+- Track multiple Codex and Claude accounts and your Antigravity account, each with its own configuration and cached usage.
 - Add, edit, color, enable, pause, and remove accounts in **Settings → Providers**, independently of T3 Code.
 - Keep a global average of weekly balances in the menu bar and below the tabs in **All**, with equal weight for each account.
 - Open **All** for compact account cards with 5h / 7d rings on the right and a combined reset list. Turn off **Settings → Appearance → Compact cards** for a two-column grid with larger rings, five-hour first and weekly second.
@@ -23,7 +23,7 @@ Previously Codex Piggy Bank. Existing preferences, notifications, and Calendar e
 
 ## Connect accounts
 
-1. Install and authenticate the CLI for each provider you use: Codex CLI or Claude Code.
+1. Install and authenticate the CLI for each provider you use: Codex CLI, Claude Code, or Antigravity CLI (`agy`).
 2. Open Tokens Piggy Bank and use the sliders button at the bottom right to open **Settings → Providers**. T3 Code is not required. Existing app accounts are preserved; **Import → Import from T3 Code…** is an optional manual import from `~/.t3/userdata/settings.json`.
 3. Choose **Add provider → Codex / Claude**. Give the account a name, such as “Claude Personal”, and choose its badge color with the native color picker. You can also change the color directly in the provider list.
 4. Keep the proposed separate account folder for a new login, or choose an existing account folder. Leave the field empty to use the CLI's default configuration. Two profiles for the same provider cannot use the same folder.
@@ -37,6 +37,8 @@ Each account has separate cached usage and reset reminder identifiers. Pausing o
 
 Claude requires a version of Claude Code that supports the experimental `get_usage` control request; tested with 2.1.308. API-key-only logins and unavailable subscription limits are shown as unavailable, never as unused quota. Claude reset grants come from the same usage endpoint Claude Code uses for them (`/api/oauth/usage?cedar_ember=1`), because `get_usage` does not include them. They are shown when the `cedar_ember` block reports eligible, usable credits and a confirmed next grant. Unreported credits are not inferred. Each grant is labeled by what it refills, following [T3 Code's grouping](https://github.com/pingdotgg/t3code/blob/9e1f81c78894270c7e281c78402a69a1a97c4474/apps/server/src/provider/claudeResetCredits.ts#L102-L125): **Fable reset** when it gives back weekly usage, otherwise its declared type or the limits it clears (**5-hour**, **Weekly**, or **Full reset**). Hover a reset's name for what it refills.
 
+Antigravity limits follow [T3 Code's quota probe](https://github.com/pingdotgg/t3code/blob/main/apps/server/src/provider/antigravityUsageLimits.ts): Gemini's 5-hour and weekly limits are the account's main limits, and the shared Claude & GPT and Gemini Argon quotas appear as separate limits. Antigravity reports no banked resets. The Antigravity CLI keeps one Google sign-in per Mac user in the Keychain, so one Antigravity account is supported; sign in with `agy`, the command **Sign in…** opens.
+
 ## Global weekly average
 
 The global percentage is the rounded arithmetic mean of the available weekly remaining percentages: `sum(weekly remaining) / account count`. This follows [T3 Code's usage-pool calculation](https://github.com/pingdotgg/t3code/blob/d033768ec73d728a1d10a75c53cf2ab195d1c867/packages/shared/src/usageLimits.ts#L454-L509). T3 groups its pools by provider; Piggy Bank applies that same equal-account mean to the main weekly limits across Codex and Claude.
@@ -47,7 +49,7 @@ Plan names and 5× / 20× tiers are descriptive labels only. They never affect t
 
 ## Data access
 
-Codex usage is read through `account/read` and `account/rateLimits/read`. Claude uses a short-lived CLI control connection with `initialize` and `get_usage`, skipping transcript analysis. Claude reset grants are then read with the account's existing Claude Code login, taken from the macOS Keychain with `security` as Claude Code does (or its `.credentials.json` elsewhere); the token is used in memory for that one request. Usage checks send no prompts, disable Claude hooks and tools, and do not consume reset credits. The app does not store credentials or update either CLI. Login starts only when you choose **Sign in…** or **Sign in again…** and is handled by the provider's CLI in Terminal.
+Codex usage is read through `account/read` and `account/rateLimits/read`. Claude uses a short-lived CLI control connection with `initialize` and `get_usage`, skipping transcript analysis. Claude reset grants are then read with the account's existing Claude Code login, taken from the macOS Keychain with `security` as Claude Code does (or its `.credentials.json` elsewhere); the token is used in memory for that one request. Antigravity quotas are read from Google's Cloud Code `retrieveUserQuotaSummary` with the Antigravity CLI's Google sign-in from the Keychain. When that sign-in is about to expire, the app runs `agy models` so the CLI refreshes and saves it. Usage checks send no prompts, disable Claude hooks and tools, and do not consume reset credits. The app does not store credentials or update either CLI. Login starts only when you choose **Sign in…** or **Sign in again…** and is handled by the provider's CLI in Terminal.
 
 ## Build and test
 

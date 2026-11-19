@@ -28,6 +28,8 @@ struct PlanCapacity: Equatable, Sendable {
             } else {
                 title = plan.isEmpty ? "Plan unavailable" : plan.capitalized
             }
+        case .antigravity:
+            title = "Google account"
         }
     }
 }

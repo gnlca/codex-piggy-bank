@@ -1,7 +1,7 @@
 T3 Code
 https://github.com/pingdotgg/t3code
 
-Claude logo SVG, provider badge conventions, usage averaging, even-pace calculations, and Claude reset-credit parsing are sourced from or adapted from T3 Code.
+Claude logo SVG, Antigravity mark, provider badge conventions, usage averaging, even-pace calculations, Claude reset-credit parsing, and Antigravity quota grouping are sourced from or adapted from T3 Code.
 Reference revision: d033768ec73d728a1d10a75c53cf2ab195d1c867
 
 MIT License
